@@ -1,0 +1,6 @@
+# OpenClaw persistent runtime data (config, Telegram pairing, gateway token, Claude CLI cache)
+/.openclaw/data/*
+!/.openclaw/data/.gitkeep
+
+# Git worktree checkouts
+/.worktrees/
