@@ -47,6 +47,57 @@ if [ -x "$FW_VENV/bin/python3" ]; then
   export PATH="$FW_VENV/bin:$PATH"
 fi
 
+# Write the faster-whisper transcription wrapper that openclaw shells out to.
+cat > "$OPENCLAW_DIR/whisper-transcribe.py" << 'PYEOF'
+#!/usr/bin/env python3
+"""Transcribe audio file using faster-whisper, printing plain text to stdout."""
+import sys, os
+from faster_whisper import WhisperModel
+
+if len(sys.argv) < 2:
+    sys.exit("Usage: whisper-transcribe.py <audio-file>")
+
+MODEL_DIR = os.path.expanduser("~/.openclaw/whisper-models")
+os.makedirs(MODEL_DIR, exist_ok=True)
+HALLUCINATIONS = {"you", "thank you.", "thank you", "thanks.", "thanks", "bye.", "bye"}
+
+model = WhisperModel("small", device="cpu", compute_type="int8", download_root=MODEL_DIR)
+segments, _ = model.transcribe(
+    sys.argv[1],
+    vad_filter=True,
+    vad_parameters={"min_speech_duration_ms": 250},
+)
+for segment in segments:
+    text = segment.text.strip()
+    if text.lower() not in HALLUCINATIONS:
+        print(text)
+PYEOF
+
+# Wire the wrapper into openclaw's local audio-transcription pipeline.
+# Idempotent (same values every run) and runs before the gateway starts, so
+# there's no live-reload race — just a plain file write.
+node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
+  && echo "Configured faster-whisper for voice transcription." \
+  || echo "Warning: failed to configure audio transcription"
+{
+  tools: {
+    media: {
+      audio: {
+        enabled: true,
+        models: [
+          {
+            type: "cli",
+            command: "$FW_VENV/bin/python3",
+            args: ["$OPENCLAW_DIR/whisper-transcribe.py", "{{MediaPath}}"],
+            timeoutSeconds: 120
+          }
+        ]
+      }
+    }
+  }
+}
+JSONEOF
+
 # If arguments were passed (docker compose exec/run <cmd>), run them directly.
 # Otherwise start the gateway (docker compose up).
 if [ $# -gt 0 ]; then

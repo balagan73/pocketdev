@@ -42,9 +42,16 @@ it.
 
 ## Voice transcription (faster-whisper)
 
-Installs into a persistent venv on first run after this feature was added.
+On first run, the entrypoint installs `faster-whisper` into a persistent venv,
+writes `whisper-transcribe.py` into the openclaw data dir, and wires it up as
+openclaw's `tools.media.audio` transcription command — all automatic, no
+manual config needed. The whisper model itself downloads into
+`.openclaw/data/whisper-models/` on first real transcription (~25s cold,
+~3s once cached).
+
 Verify it worked with:
 
 ```bash
 docker compose exec openclaw python3 -c "import faster_whisper; print('ok')"
+docker compose exec openclaw node openclaw.mjs config get tools.media.audio
 ```
