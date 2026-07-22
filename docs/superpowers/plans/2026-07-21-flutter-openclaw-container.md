@@ -16,6 +16,7 @@
 - OpenClaw auth reuses the host's Claude Code subscription via a read-write bind mount of `~/.claude` — the one deliberate credential exposure into the container.
 - `.githooks/pre-commit` blocks commits to `main`/`master`, wired via per-container `GIT_CONFIG_*` env vars so the host's own `.git/config` is never touched.
 - Confirmed on this host: Docker 29.6.2, Docker Compose v5.3.1, host UID 1000, `git`/`curl` already present in the base image; `unzip`/`xz-utils` are not and must be installed.
+- Confirmed in the base image: `python3` and the `venv` module are already present; `ffmpeg` is not and must be installed (relevant to Task 6).
 
 ---
 
@@ -121,7 +122,7 @@ git commit -m "Add pre-commit branch guard and OpenClaw data scaffolding"
 
 **Interfaces:**
 - Consumes: nothing from earlier tasks (independent of Task 1).
-- Produces: image `flutterclaw-openclaw:dev` (dev tag for local testing) with `flutter` on `PATH` for the `node` user (UID 1000), web target enabled — consumed by Task 3 (entrypoint smoke test) and Task 4 (`docker-compose.yml` build).
+- Produces: image `flutterclaw-openclaw:dev` (dev tag for local testing) with `flutter` on `PATH` for the `node` user (UID 1000), web target enabled — consumed by Task 3 (entrypoint smoke test) and Task 4 (`docker-compose.yml` build). Also extended by Task 5 (faster-whisper).
 
 - [ ] **Step 1: Write the Dockerfile**
 
@@ -196,7 +197,7 @@ git commit -m "Add Flutter (web-only) layer on top of the OpenClaw base image"
 
 **Interfaces:**
 - Consumes: image `flutterclaw-openclaw:dev` from Task 2 (for the smoke test only).
-- Produces: `.openclaw/entrypoint.sh`, invoked as the container's `entrypoint` — consumed by Task 4's `docker-compose.yml`. Writes `OPENCLAW_GATEWAY_TOKEN=<token>` to `$OPENCLAW_CONFIG_DIR/.env` (i.e. `/home/node/.openclaw/.env`) on first run — consumed by Task 4's health check and Task 5's pairing step.
+- Produces: `.openclaw/entrypoint.sh`, invoked as the container's `entrypoint` — consumed by Task 4's `docker-compose.yml`. Writes `OPENCLAW_GATEWAY_TOKEN=<token>` to `$OPENCLAW_CONFIG_DIR/.env` (i.e. `/home/node/.openclaw/.env`) on first run — consumed by Task 4's health check and Task 6's pairing step. Also extended by Task 5 (faster-whisper).
 
 - [ ] **Step 1: Write the entrypoint script**
 
@@ -298,7 +299,7 @@ git commit -m "Add OpenClaw container entrypoint (Claude CLI install, gateway to
 
 **Interfaces:**
 - Consumes: `.openclaw/Dockerfile` (Task 2), `.openclaw/entrypoint.sh` (Task 3), `.githooks/pre-commit` + `.openclaw/data/` (Task 1).
-- Produces: a running `openclaw` service reachable via `docker compose exec openclaw ...` — consumed by Task 5 (Telegram pairing).
+- Produces: a running `openclaw` service reachable via `docker compose exec openclaw ...` — consumed by Task 5 (faster-whisper verification) and Task 6 (Telegram pairing).
 
 - [ ] **Step 1: Write docker-compose.yml**
 
@@ -409,7 +410,184 @@ git commit -m "Add docker-compose.yml running OpenClaw + Flutter as a single con
 
 ---
 
-### Task 5: Telegram pairing and allowlist
+### Task 5: faster-whisper voice transcription support
+
+**Added:** 2026-07-22, at the user's request (reordered ahead of the original Task 5 since it doesn't require Telegram credentials to implement or verify — Telegram pairing is now Task 6). Mirrors the equivalent addition on `gizra/drupal-starter`'s `agent-balagan` branch (commit `f3f3739`).
+
+**Files:**
+- Modify: `.openclaw/Dockerfile` (from Task 2)
+- Modify: `.openclaw/entrypoint.sh` (from Task 3)
+
+**Interfaces:**
+- Consumes: the existing Dockerfile and entrypoint.sh content from Tasks 2 and 3 — this task extends both, it does not replace them.
+- Produces: a `faster-whisper` Python package installed into a persistent venv at `/home/node/.openclaw/faster-whisper-venv` (cached across container restarts, same pattern as the Claude CLI install in Task 3), with that venv's `bin/` prepended to `PATH` so OpenClaw can transcribe voice messages sent via Telegram once Task 6 is resumed.
+
+- [ ] **Step 1: Add `ffmpeg` to the Dockerfile's apt-get install line**
+
+`python3` and the `venv` module are already present in the base image (confirmed on this host — see Global Constraints), so only `ffmpeg` needs adding. Change the existing `RUN apt-get ... unzip xz-utils ...` line in `.openclaw/Dockerfile` to also install `ffmpeg`:
+
+```dockerfile
+FROM ghcr.io/openclaw/openclaw:latest
+
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends unzip xz-utils ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+USER node
+
+ENV FLUTTER_HOME=/home/node/flutter
+ENV PATH="$FLUTTER_HOME/bin:$PATH"
+
+RUN git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$FLUTTER_HOME" \
+  && flutter config --enable-web --no-analytics \
+  && flutter precache --web
+
+# Informational only — flutter doctor reports on Android/desktop/Chrome
+# tooling we deliberately don't install; never fail the build on it.
+RUN flutter doctor -v || true
+```
+
+(Only the `apt-get install` line changed — `unzip xz-utils` became `unzip xz-utils ffmpeg` — everything else in the file is unchanged from Task 2.)
+
+- [ ] **Step 2: Rebuild the image and verify `ffmpeg` is present**
+
+```bash
+docker build -t flutterclaw-openclaw:dev ./.openclaw
+docker run --rm flutterclaw-openclaw:dev ffmpeg -version
+```
+
+Expected: prints an ffmpeg version banner (starts with `ffmpeg version ...`) instead of "command not found".
+
+- [ ] **Step 3: Verify Flutter still works (regression check)**
+
+```bash
+docker run --rm flutterclaw-openclaw:dev flutter --version
+```
+
+Expected: same `Flutter`/`channel stable` output as Task 2 — confirms adding `ffmpeg` didn't disturb the existing Flutter layer.
+
+- [ ] **Step 4: Insert the faster-whisper install block into entrypoint.sh**
+
+In `.openclaw/entrypoint.sh`, insert this new block immediately after the existing gateway-token-generation block (after its closing `fi` and the `echo "===...==="` lines) and before the existing `# If arguments were passed ...` passthrough comment:
+
+```bash
+# Install faster-whisper into a persistent venv on first run (voice message transcription).
+FW_VENV="/home/node/.openclaw/faster-whisper-venv"
+FW_BIN="$FW_VENV/bin/pip"
+if [ ! -x "$FW_BIN" ]; then
+  echo "Installing faster-whisper (first run — cached in openclaw data dir)..."
+  rm -rf "$FW_VENV"
+  python3 -m venv "$FW_VENV" \
+    && "$FW_VENV/bin/pip" install --quiet faster-whisper \
+    && echo "faster-whisper installed." \
+    || echo "Warning: faster-whisper install failed"
+fi
+if [ -x "$FW_VENV/bin/python3" ]; then
+  export PATH="$FW_VENV/bin:$PATH"
+fi
+```
+
+The full file after this change (for reference — the only new lines are the block above, inserted at the marked point):
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+# Avoid git "dubious ownership" errors against the bind-mounted /workspace repo.
+if ! git config --global --get-all safe.directory 2>/dev/null | grep -qx /workspace; then
+  git config --global --add safe.directory /workspace
+fi
+
+# Install Claude Code CLI into the persistent data dir on first run (cached across restarts).
+CLAUDE_PREFIX="/home/node/.openclaw/claude-cli"
+CLAUDE_BIN="$CLAUDE_PREFIX/bin/claude"
+if [ ! -x "$CLAUDE_BIN" ]; then
+  echo "Installing Claude Code CLI (first run — cached in openclaw data dir)..."
+  npm install -g @anthropic-ai/claude-code --prefix "$CLAUDE_PREFIX" --quiet 2>&1 \
+    && echo "Claude CLI installed." \
+    || echo "Warning: Claude CLI install failed — claude-cli/* models unavailable"
+fi
+if [ -x "$CLAUDE_BIN" ]; then
+  export PATH="$CLAUDE_PREFIX/bin:$PATH"
+fi
+
+# Generate a gateway auth token on first run and print it once.
+OPENCLAW_DIR="/home/node/.openclaw"
+OPENCLAW_ENV="$OPENCLAW_DIR/.env"
+mkdir -p "$OPENCLAW_DIR"
+if ! grep -q "^OPENCLAW_GATEWAY_TOKEN=" "$OPENCLAW_ENV" 2>/dev/null; then
+  TOKEN=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 32) || true
+  printf "OPENCLAW_GATEWAY_TOKEN=%s\n" "$TOKEN" >> "$OPENCLAW_ENV"
+  echo "============================================================"
+  echo "Generated gateway token: $TOKEN"
+  echo "Run: docker compose exec openclaw node openclaw.mjs health --token $TOKEN"
+  echo "============================================================"
+fi
+
+# Install faster-whisper into a persistent venv on first run (voice message transcription).
+FW_VENV="/home/node/.openclaw/faster-whisper-venv"
+FW_BIN="$FW_VENV/bin/pip"
+if [ ! -x "$FW_BIN" ]; then
+  echo "Installing faster-whisper (first run — cached in openclaw data dir)..."
+  rm -rf "$FW_VENV"
+  python3 -m venv "$FW_VENV" \
+    && "$FW_VENV/bin/pip" install --quiet faster-whisper \
+    && echo "faster-whisper installed." \
+    || echo "Warning: faster-whisper install failed"
+fi
+if [ -x "$FW_VENV/bin/python3" ]; then
+  export PATH="$FW_VENV/bin:$PATH"
+fi
+
+# If arguments were passed (docker compose exec/run <cmd>), run them directly.
+# Otherwise start the gateway (docker compose up).
+if [ $# -gt 0 ]; then
+  exec "$@"
+fi
+
+# --bind lan is required for Docker's bridge networking; loopback-only won't be reachable.
+exec node openclaw.mjs gateway --allow-unconfigured --bind lan
+```
+
+- [ ] **Step 5: Syntax-check the updated entrypoint.sh**
+
+```bash
+bash -n .openclaw/entrypoint.sh
+```
+
+Expected: no output, exit code 0.
+
+- [ ] **Step 6: Smoke-test the faster-whisper install and PATH wiring**
+
+Using a fresh throwaway volume (same pattern as Task 3's smoke test):
+
+```bash
+docker volume create flutterclaw-oc-test-data
+docker run --rm \
+  -v "$(pwd)/.openclaw/entrypoint.sh:/oc-init/entrypoint.sh:ro" \
+  -v flutterclaw-oc-test-data:/home/node/.openclaw \
+  --entrypoint /bin/bash \
+  flutterclaw-openclaw:dev /oc-init/entrypoint.sh python3 -c "import faster_whisper; print('faster_whisper import OK')"
+```
+
+Expected: logs show the Claude CLI install banner, the gateway token banner, then "Installing faster-whisper..." followed by "faster-whisper installed.", and finally `faster_whisper import OK` as the last line. That last line only prints successfully if `PATH` was correctly updated to put the venv's `bin/` first — otherwise `python3` would resolve to the system interpreter, which doesn't have `faster_whisper` installed, and the import would fail instead.
+
+- [ ] **Step 7: Clean up the test volume**
+
+```bash
+docker volume rm flutterclaw-oc-test-data
+```
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add .openclaw/Dockerfile .openclaw/entrypoint.sh
+git commit -m "Add faster-whisper voice transcription support"
+```
+
+---
+
+### Task 6: Telegram pairing and allowlist
 
 **Files:**
 - Modify (at runtime, not tracked in git): `.openclaw/data/openclaw.json` — created by OpenClaw itself on first channel pairing; this task edits it afterward. It lives under the gitignored `.openclaw/data/` path, so no repo commit results from this task unless noted in Step 6.
