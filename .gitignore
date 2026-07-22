@@ -4,3 +4,13 @@
 
 # Git worktree checkouts
 /.worktrees/
+
+# OpenClaw workspace scaffold (auto-generated persona/memory files, created
+# on first run because OPENCLAW_WORKSPACE_DIR points at the project root)
+/AGENTS.md
+/HEARTBEAT.md
+/IDENTITY.md
+/SOUL.md
+/TOOLS.md
+/USER.md
+/openclaw-workspace-state.json
