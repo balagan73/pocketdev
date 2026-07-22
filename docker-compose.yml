@@ -1,0 +1,32 @@
+# OpenClaw runs as a single container: the full gateway process plus a
+# Flutter SDK (web target only), giving it read/write/execute access
+# scoped to this repo and nothing else on the host.
+#
+# First run:
+#   docker compose up -d --build
+#   docker compose logs openclaw   # copy the printed gateway token
+#
+# Pair Telegram:
+#   docker compose exec openclaw node openclaw.mjs channels add --channel telegram --token "<bot-token>"
+
+services:
+  openclaw:
+    build:
+      context: ./.openclaw
+      dockerfile: Dockerfile
+    container_name: flutterclaw-openclaw
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "/oc-init/entrypoint.sh"]
+    environment:
+      - OPENCLAW_SKIP_ONBOARDING=true
+      - OPENCLAW_CONFIG_DIR=/home/node/.openclaw
+      - OPENCLAW_WORKSPACE_DIR=/workspace
+      # Block commits to main/master from inside this container only.
+      - GIT_CONFIG_COUNT=1
+      - GIT_CONFIG_KEY_0=core.hookspath
+      - GIT_CONFIG_VALUE_0=.githooks
+    volumes:
+      - .:/workspace
+      - ./.openclaw/data:/home/node/.openclaw
+      - ./.openclaw/entrypoint.sh:/oc-init/entrypoint.sh:ro
+      - ${HOME}/.claude:/home/node/.claude
