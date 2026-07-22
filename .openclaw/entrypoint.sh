@@ -20,6 +20,7 @@ if [ -x "$CLAUDE_BIN" ]; then
 fi
 
 # Generate a gateway auth token on first run and print it once.
+# Note: not explicitly sourced here — OpenClaw itself loads .env from $OPENCLAW_CONFIG_DIR on startup (confirmed by Task 4's health check).
 OPENCLAW_DIR="/home/node/.openclaw"
 OPENCLAW_ENV="$OPENCLAW_DIR/.env"
 mkdir -p "$OPENCLAW_DIR"
@@ -34,8 +35,7 @@ fi
 
 # Install faster-whisper into a persistent venv on first run (voice message transcription).
 FW_VENV="/home/node/.openclaw/faster-whisper-venv"
-FW_BIN="$FW_VENV/bin/pip"
-if [ ! -x "$FW_BIN" ]; then
+if ! "$FW_VENV/bin/python3" -c "import faster_whisper" 2>/dev/null; then
   echo "Installing faster-whisper (first run — cached in openclaw data dir)..."
   rm -rf "$FW_VENV"
   python3 -m venv "$FW_VENV" \
