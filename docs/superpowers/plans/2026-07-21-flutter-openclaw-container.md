@@ -16,7 +16,7 @@
 - OpenClaw auth reuses the host's Claude Code subscription via a read-write bind mount of `~/.claude` — the one deliberate credential exposure into the container.
 - `.githooks/pre-commit` blocks commits to `main`/`master`, wired via per-container `GIT_CONFIG_*` env vars so the host's own `.git/config` is never touched.
 - Confirmed on this host: Docker 29.6.2, Docker Compose v5.3.1, host UID 1000, `git`/`curl` already present in the base image; `unzip`/`xz-utils` are not and must be installed.
-- Confirmed in the base image: `python3` and the `venv` module are already present; `ffmpeg` is not and must be installed (relevant to Task 6).
+- Confirmed in the base image: `python3` is present, but actually creating a venv requires the separate `python3-venv` package (an earlier check that only ran `python3 -m venv --help` missed this — `--help` succeeds without `ensurepip`, but venv creation fails without it). Neither `python3-venv` nor `ffmpeg` are present and both must be installed (relevant to Task 5).
 
 ---
 
