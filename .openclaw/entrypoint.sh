@@ -131,7 +131,9 @@ path = "/home/node/.openclaw/openclaw.json"
 try:
     with open(path) as f:
         cfg = json.load(f)
-    providers = cfg.setdefault("tools", {}).setdefault("speech", {}).setdefault("providers", {})
+    tts = cfg.setdefault("messages", {}).setdefault("tts", {})
+    tts["enabled"] = True
+    providers = tts.setdefault("providers", {})
     entry = providers.setdefault("tts-local-cli", {})
     entry["command"] = "$PIPER_BIN"
     entry["args"] = ["--model", "$PIPER_MODEL", "--output-file", "{{OutputPath}}"]
