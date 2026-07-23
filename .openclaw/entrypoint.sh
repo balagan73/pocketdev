@@ -105,10 +105,13 @@ JSONEOF
 # appears then disappears" effect the user sees with voice messages.
 # In "progress" mode the draft shows a "working..." indicator; the final
 # answer is delivered as a single permanent message.
+# toolProgress:false prevents tool results (e.g. bash output) from also
+# appearing in the draft — in progress mode they default to visible, which
+# produces the same flash-and-disappear effect on tool calls.
 node openclaw.mjs config patch --stdin << 'JSONEOF' >/dev/null 2>&1 \
   && echo "Configured Telegram streaming mode (progress)." \
   || echo "Warning: failed to configure Telegram streaming mode"
-{ channels: { telegram: { streaming: { mode: "progress" } } } }
+{ channels: { telegram: { streaming: { mode: "progress", progress: { toolProgress: false } } } } }
 JSONEOF
 
 # If arguments were passed (docker compose exec/run <cmd>), run them directly.
