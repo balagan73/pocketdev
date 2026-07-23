@@ -98,6 +98,19 @@ node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
 }
 JSONEOF
 
+# Switch Telegram streaming to "progress" mode so the temporary tool-progress
+# draft is clearly distinct from the final answer.  Without this, the default
+# "partial" mode streams the partial answer text into a draft message, then
+# deletes that draft when the final answer arrives — producing the "text
+# appears then disappears" effect the user sees with voice messages.
+# In "progress" mode the draft shows a "working..." indicator; the final
+# answer is delivered as a single permanent message.
+node openclaw.mjs config patch --stdin << 'JSONEOF' >/dev/null 2>&1 \
+  && echo "Configured Telegram streaming mode (progress)." \
+  || echo "Warning: failed to configure Telegram streaming mode"
+{ channels: { telegram: { streaming: { mode: "progress" } } } }
+JSONEOF
+
 # If arguments were passed (docker compose exec/run <cmd>), run them directly.
 # Otherwise start the gateway (docker compose up).
 if [ $# -gt 0 ]; then
