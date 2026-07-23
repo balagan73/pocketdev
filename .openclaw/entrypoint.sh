@@ -123,7 +123,7 @@ if [ ! -f "$PIPER_MODEL" ]; then
 fi
 
 # Wire piper into openclaw's TTS pipeline (tts-local-cli provider).
-# The config path is protected; we edit openclaw.json directly and do a hot-reload.
+# messages.tts is protected; edit openclaw.json directly.
 if [ -x "$PIPER_BIN" ] && [ -f "$PIPER_MODEL" ]; then
   python3 - << PYEOF
 import json, sys
@@ -133,11 +133,14 @@ try:
         cfg = json.load(f)
     tts = cfg.setdefault("messages", {}).setdefault("tts", {})
     tts["enabled"] = True
+    tts["auto"] = "inbound"
     providers = tts.setdefault("providers", {})
     entry = providers.setdefault("tts-local-cli", {})
     entry["command"] = "$PIPER_BIN"
     entry["args"] = ["--model", "$PIPER_MODEL", "--output-file", "{{OutputPath}}"]
     entry["outputFormat"] = "wav"
+    # Enable the tts-local-cli plugin
+    cfg.setdefault("plugins", {}).setdefault("entries", {}).setdefault("tts-local-cli", {})["enabled"] = True
     with open(path, "w") as f:
         json.dump(cfg, f, indent=2)
     print("Configured piper TTS.")
