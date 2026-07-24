@@ -30,7 +30,7 @@ RUN mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools" \
 RUN yes | sdkmanager --licenses > /dev/null 2>&1 \
   && sdkmanager \
      "platform-tools" \
-     "build-tools;35.0.0" \
-     "platforms;android-35"
+     "build-tools;36.0.0" \
+     "platforms;android-36"
 
 RUN flutter doctor -v || true
