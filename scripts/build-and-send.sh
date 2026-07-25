@@ -25,13 +25,16 @@ APK_SIZE=$(du -sh "$APK_PATH" | cut -f1)
 GIT_HASH=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 GIT_MSG=$(git -C "$REPO_ROOT" log -1 --pretty=format:"%s")
 
+ZIP_PATH="${APK_PATH%.apk}.zip"
+python3 -c "import shutil, os; shutil.make_archive('${ZIP_PATH%.zip}', 'zip', os.path.dirname('$APK_PATH'), os.path.basename('$APK_PATH'))"
+
 echo "Build successful (${APK_SIZE}). Sending to Telegram..."
 
 openclaw message send \
   --channel telegram \
   --target "$TELEGRAM_CHAT_ID" \
-  --media "$APK_PATH" \
+  --media "$ZIP_PATH" \
   --force-document \
-  --message "New build ready — ${GIT_HASH}: ${GIT_MSG} (${APK_SIZE})"
+  --message "New build ready — ${GIT_HASH}: ${GIT_MSG} (${APK_SIZE}) — unzip to install"
 
 echo "Done. APK sent to Telegram."
