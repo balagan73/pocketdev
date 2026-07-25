@@ -7,7 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$REPO_ROOT/app"
-APK_PATH="$APP_DIR/build/app/outputs/flutter-apk/app-release.apk"
+# arm64-v8a only — ~6-8MB vs ~40MB fat APK; covers all modern Android phones
+APK_PATH="$APP_DIR/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
 TELEGRAM_CHAT_ID="6881839256"
 BOT_TOKEN=$(python3 -c "import json; cfg=json.load(open('/home/node/.openclaw/openclaw.json')); print(cfg['channels']['telegram']['botToken'])")
 
@@ -15,7 +16,7 @@ echo "=== Flutter APK Build & Deploy ==="
 echo "Building release APK..."
 
 cd "$APP_DIR"
-flutter build apk --release 2>&1
+flutter build apk --release --split-per-abi 2>&1
 
 if [ ! -f "$APK_PATH" ]; then
   echo "ERROR: APK not found at $APK_PATH"
@@ -30,7 +31,7 @@ echo "Build successful (${APK_SIZE}). Sending APK to Telegram..."
 
 curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
   -F "chat_id=${TELEGRAM_CHAT_ID}" \
-  -F "document=@${APK_PATH};filename=app-release.apk" \
+  -F "document=@${APK_PATH};filename=app-release-arm64.apk" \
   -F "caption=New build ready — ${GIT_HASH}: ${GIT_MSG} (${APK_SIZE})" \
   | python3 -c "import json,sys; r=json.load(sys.stdin); print('Sent OK' if r.get('ok') else f'Error: {r}')"
 
