@@ -12,6 +12,10 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 RESET='\033[0m'
 
+# Always restore the cursor if we hid it during an interactive selection,
+# even if the user Ctrl-C's out mid-selection.
+trap 'tput cnorm 2>/dev/null || true' EXIT
+
 echo -e "${BOLD}${CYAN}"
 echo "  ____             _        _     ____             "
 echo " |  _ \ ___   ___| | _____| |_  |  _ \  _____   __"
@@ -56,6 +60,94 @@ if [ -d "$EXTENSIONS_DIR" ]; then
     done
 fi
 
+# --- Helper: interactive checkbox multi-select (pure bash, ANSI escapes) ---
+# Arrow keys (or j/k) move the cursor, space toggles the item, enter confirms.
+# Usage: checkbox_select ids_array_name descs_array_name selected_array_name
+checkbox_select() {
+    local -n _ids="$1"
+    local -n _descs="$2"
+    local -n _selected="$3"
+    local n="${#_ids[@]}"
+    local -a checked=()
+    local i cursor=0 key rest mark prefix
+
+    for ((i = 0; i < n; i++)); do checked[i]=0; done
+
+    echo -e "  (arrows or j/k to move, ${CYAN}space${RESET} to toggle, ${CYAN}enter${RESET} to confirm)"
+    tput civis 2>/dev/null || true
+
+    local drawn=0
+    while true; do
+        if [ "$drawn" -eq 1 ]; then
+            printf '\033[%dA' "$n"
+        fi
+        drawn=1
+
+        for ((i = 0; i < n; i++)); do
+            printf '\033[2K\r'
+            mark=" "
+            prefix="  "
+            [ "${checked[i]}" -eq 1 ] && mark="x"
+            [ "$i" -eq "$cursor" ] && prefix="${CYAN}>${RESET} "
+            if [ "${checked[i]}" -eq 1 ]; then
+                echo -e "${prefix}[${GREEN}${mark}${RESET}] ${GREEN}${_ids[i]}${RESET} — ${_descs[i]}"
+            else
+                echo -e "${prefix}[${mark}] ${_ids[i]} — ${_descs[i]}"
+            fi
+        done
+
+        rest=""
+        if ! IFS= read -rsn1 key; then
+            break
+        fi
+        if [[ "$key" == $'\x1b' ]]; then
+            IFS= read -rsn2 -t 0.05 rest || true
+            key+="$rest"
+        fi
+
+        case "$key" in
+            $'\x1b[A'|k|K) cursor=$(( (cursor - 1 + n) % n )) ;;
+            $'\x1b[B'|j|J) cursor=$(( (cursor + 1) % n )) ;;
+            ' ') if [ "${checked[cursor]}" -eq 1 ]; then checked[cursor]=0; else checked[cursor]=1; fi ;;
+            '') break ;;
+        esac
+    done
+    tput cnorm 2>/dev/null || true
+
+    _selected=()
+    for ((i = 0; i < n; i++)); do
+        if [ "${checked[i]}" -eq 1 ]; then
+            _selected+=("${_ids[i]}")
+        fi
+    done
+}
+
+# --- Helper: numbered-list select (fallback when stdin is not a TTY) ---
+# Usage: numbered_select ids_array_name descs_array_name selected_array_name "prompt text"
+numbered_select() {
+    local -n _ids="$1"
+    local -n _descs="$2"
+    local -n _selected="$3"
+    local prompt="$4"
+    local i num input
+
+    for i in "${!_ids[@]}"; do
+        echo "  $((i + 1)). ${_ids[$i]} — ${_descs[$i]}"
+    done
+    echo ""
+    echo -e "$prompt"
+    read -r input
+
+    _selected=()
+    for num in $input; do
+        if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#_ids[@]}" ]; then
+            _selected+=("${_ids[$((num - 1))]}")
+        else
+            echo "  Ignoring invalid selection: $num"
+        fi
+    done
+}
+
 # --- Select stacks ---
 selected_stacks=()
 
@@ -63,20 +155,12 @@ if [ ${#STACK_IDS[@]} -eq 0 ]; then
     echo "No stacks available."
 else
     echo -e "${BOLD}Available stacks:${RESET}"
-    for i in "${!STACK_IDS[@]}"; do
-        echo "  $((i+1)). ${STACK_IDS[$i]} — ${STACK_DESCS[$i]}"
-    done
-    echo ""
-    echo -e "Select stacks (space-separated numbers, e.g. ${CYAN}1 2${RESET}, or press Enter for none):"
-    read -r stack_input
-
-    for num in $stack_input; do
-        if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#STACK_IDS[@]}" ]; then
-            selected_stacks+=("${STACK_IDS[$((num-1))]}")
-        else
-            echo "  Ignoring invalid selection: $num"
-        fi
-    done
+    if [ -t 0 ]; then
+        checkbox_select STACK_IDS STACK_DESCS selected_stacks
+    else
+        numbered_select STACK_IDS STACK_DESCS selected_stacks \
+            "Select stacks (space-separated numbers, e.g. ${CYAN}1 2${RESET}, or press Enter for none):"
+    fi
 fi
 
 echo ""
@@ -88,20 +172,12 @@ if [ ${#EXT_IDS[@]} -eq 0 ]; then
     echo "No extensions available."
 else
     echo -e "${BOLD}Available extensions:${RESET}"
-    for i in "${!EXT_IDS[@]}"; do
-        echo "  $((i+1)). ${EXT_IDS[$i]} — ${EXT_DESCS[$i]}"
-    done
-    echo ""
-    echo -e "Select extensions (space-separated numbers, or press Enter for none):"
-    read -r ext_input
-
-    for num in $ext_input; do
-        if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#EXT_IDS[@]}" ]; then
-            selected_extensions+=("${EXT_IDS[$((num-1))]}")
-        else
-            echo "  Ignoring invalid selection: $num"
-        fi
-    done
+    if [ -t 0 ]; then
+        checkbox_select EXT_IDS EXT_DESCS selected_extensions
+    else
+        numbered_select EXT_IDS EXT_DESCS selected_extensions \
+            "Select extensions (space-separated numbers, or press Enter for none):"
+    fi
 fi
 
 echo ""
