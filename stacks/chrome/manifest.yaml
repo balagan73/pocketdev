@@ -1,0 +1,3 @@
+name: chrome
+description: Chromium browser for Flutter web debugging (flutter test --platform chrome, flutter run -d chrome)
+requires_rebuild: true
