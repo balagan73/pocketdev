@@ -1,0 +1,3 @@
+name: linux-desktop
+description: Linux desktop build toolchain for Flutter (list after the flutter stack in pocketdev.yaml so Flutter can enable the Linux desktop target during this stack's install)
+requires_rebuild: true
