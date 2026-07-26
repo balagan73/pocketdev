@@ -1,6 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
+# Source stack runtime env vars written by install scripts at build time
+if [ -d /pocket-dev/env ]; then
+    for envfile in /pocket-dev/env/*.env; do
+        [ -f "$envfile" ] && source "$envfile"
+    done
+fi
+
+# Run extension install scripts (extensions don't require a Docker rebuild)
+POCKETDEV_YAML="/pocket-dev/pocketdev.yaml"
+if [ -f "$POCKETDEV_YAML" ]; then
+    extensions=$(awk '/^extensions:/{found=1; next} found && /^[^ ]/{found=0} found && /^  - /{gsub(/^  - /, ""); print}' "$POCKETDEV_YAML")
+    for ext in $extensions; do
+        install_script="/pocket-dev/extensions/$ext/install.sh"
+        if [ -f "$install_script" ]; then
+            echo "pocket-dev: installing extension: $ext"
+            bash "$install_script"
+        fi
+    done
+fi
+
 # Avoid git "dubious ownership" errors against the bind-mounted /workspace repo.
 if ! git config --global --get-all safe.directory 2>/dev/null | grep -qx /workspace; then
   git config --global --add safe.directory /workspace
@@ -32,138 +52,6 @@ if ! grep -q "^OPENCLAW_GATEWAY_TOKEN=" "$OPENCLAW_ENV" 2>/dev/null; then
   echo "Run: docker compose exec openclaw node openclaw.mjs health --token $TOKEN"
   echo "============================================================"
 fi
-
-# Install faster-whisper into a persistent venv on first run (voice message transcription).
-FW_VENV="/home/node/.openclaw/faster-whisper-venv"
-if ! "$FW_VENV/bin/python3" -c "import faster_whisper" 2>/dev/null; then
-  echo "Installing faster-whisper (first run — cached in openclaw data dir)..."
-  rm -rf "$FW_VENV"
-  python3 -m venv "$FW_VENV" \
-    && "$FW_VENV/bin/pip" install --quiet faster-whisper \
-    && echo "faster-whisper installed." \
-    || echo "Warning: faster-whisper install failed"
-fi
-if [ -x "$FW_VENV/bin/python3" ]; then
-  export PATH="$FW_VENV/bin:$PATH"
-fi
-
-# Write the faster-whisper transcription wrapper that openclaw shells out to.
-cat > "$OPENCLAW_DIR/whisper-transcribe.py" << 'PYEOF'
-#!/usr/bin/env python3
-"""Transcribe audio file using faster-whisper, printing plain text to stdout."""
-import sys, os
-from faster_whisper import WhisperModel
-
-if len(sys.argv) < 2:
-    sys.exit("Usage: whisper-transcribe.py <audio-file>")
-
-MODEL_DIR = os.path.expanduser("~/.openclaw/whisper-models")
-os.makedirs(MODEL_DIR, exist_ok=True)
-HALLUCINATIONS = {"you", "thank you.", "thank you", "thanks.", "thanks", "bye.", "bye"}
-
-model = WhisperModel("small", device="cpu", compute_type="int8", download_root=MODEL_DIR)
-segments, _ = model.transcribe(
-    sys.argv[1],
-    vad_filter=True,
-    vad_parameters={"min_speech_duration_ms": 250},
-)
-for segment in segments:
-    text = segment.text.strip()
-    if text.lower() not in HALLUCINATIONS:
-        print(text)
-PYEOF
-
-# Wire the wrapper into openclaw's local audio-transcription pipeline.
-# Idempotent (same values every run) and runs before the gateway starts, so
-# there's no live-reload race — just a plain file write.
-node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
-  && echo "Configured faster-whisper for voice transcription." \
-  || echo "Warning: failed to configure audio transcription"
-{
-  tools: {
-    media: {
-      audio: {
-        enabled: true,
-        models: [
-          {
-            type: "cli",
-            command: "$FW_VENV/bin/python3",
-            args: ["$OPENCLAW_DIR/whisper-transcribe.py", "{{MediaPath}}"],
-            timeoutSeconds: 120
-          }
-        ]
-      }
-    }
-  }
-}
-JSONEOF
-
-# Install piper-tts into a persistent venv on first run (voice message synthesis).
-PIPER_VENV="/home/node/.openclaw/piper-venv"
-PIPER_BIN="$PIPER_VENV/bin/piper"
-if [ ! -x "$PIPER_BIN" ]; then
-  echo "Installing piper-tts (first run — cached in openclaw data dir)..."
-  python3 -m venv "$PIPER_VENV" \
-    && "$PIPER_VENV/bin/pip" install --quiet piper-tts \
-    && echo "piper-tts installed." \
-    || echo "Warning: piper-tts install failed"
-fi
-
-# Download the default voice model on first run.
-PIPER_VOICES="/home/node/.openclaw/piper-voices"
-PIPER_MODEL="$PIPER_VOICES/en_US-lessac-medium.onnx"
-if [ ! -f "$PIPER_MODEL" ]; then
-  echo "Downloading piper voice model (en_US-lessac-medium)..."
-  mkdir -p "$PIPER_VOICES"
-  BASE="https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium"
-  curl -sL "$BASE/en_US-lessac-medium.onnx" -o "$PIPER_MODEL" \
-    && curl -sL "$BASE/en_US-lessac-medium.onnx.json" -o "$PIPER_MODEL.json" \
-    && echo "Voice model downloaded." \
-    || echo "Warning: voice model download failed"
-fi
-
-# Wire piper into openclaw's TTS pipeline (tts-local-cli provider).
-# messages.tts is protected; edit openclaw.json directly.
-if [ -x "$PIPER_BIN" ] && [ -f "$PIPER_MODEL" ]; then
-  python3 - << PYEOF
-import json, sys
-path = "/home/node/.openclaw/openclaw.json"
-try:
-    with open(path) as f:
-        cfg = json.load(f)
-    tts = cfg.setdefault("messages", {}).setdefault("tts", {})
-    tts["enabled"] = True
-    tts["auto"] = "inbound"
-    providers = tts.setdefault("providers", {})
-    entry = providers.setdefault("tts-local-cli", {})
-    entry["command"] = "$PIPER_BIN"
-    entry["args"] = ["--model", "$PIPER_MODEL", "--output-file", "{{OutputPath}}"]
-    entry["outputFormat"] = "wav"
-    # Enable the tts-local-cli plugin
-    cfg.setdefault("plugins", {}).setdefault("entries", {}).setdefault("tts-local-cli", {})["enabled"] = True
-    with open(path, "w") as f:
-        json.dump(cfg, f, indent=2)
-    print("Configured piper TTS.")
-except Exception as e:
-    print(f"Warning: failed to configure piper TTS: {e}", file=sys.stderr)
-PYEOF
-fi
-
-# Switch Telegram streaming to "progress" mode so the temporary tool-progress
-# draft is clearly distinct from the final answer.  Without this, the default
-# "partial" mode streams the partial answer text into a draft message, then
-# deletes that draft when the final answer arrives — producing the "text
-# appears then disappears" effect the user sees with voice messages.
-# In "progress" mode the draft shows a "working..." indicator; the final
-# answer is delivered as a single permanent message.
-# toolProgress:false prevents tool results (e.g. bash output) from also
-# appearing in the draft — in progress mode they default to visible, which
-# produces the same flash-and-disappear effect on tool calls.
-node openclaw.mjs config patch --stdin << 'JSONEOF' >/dev/null 2>&1 \
-  && echo "Configured Telegram streaming mode (progress)." \
-  || echo "Warning: failed to configure Telegram streaming mode"
-{ channels: { telegram: { streaming: { mode: "progress", progress: { toolProgress: false } } } } }
-JSONEOF
 
 # If arguments were passed (docker compose exec/run <cmd>), run them directly.
 # Otherwise start the gateway (docker compose up).
