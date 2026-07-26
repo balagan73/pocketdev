@@ -5,6 +5,9 @@
 # Git worktree checkouts
 /.worktrees/
 
+# Ad-hoc task backlog for AI agents (MVP, not yet tracked via GitHub issues)
+/tasks/
+
 # OpenClaw workspace scaffold (auto-generated persona/memory files, created
 # on first run because OPENCLAW_WORKSPACE_DIR points at the project root)
 /AGENTS.md
