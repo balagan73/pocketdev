@@ -1,0 +1,3 @@
+name: telegram
+description: Telegram channel streaming-mode tuning (progress-style draft messages instead of flashing partial text)
+requires_rebuild: false

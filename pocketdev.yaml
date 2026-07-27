@@ -1,0 +1,12 @@
+# pocket-dev configuration
+# Edit this file and run ./rebuild.sh to apply changes,
+# or run ./setup.sh to reconfigure interactively.
+
+stacks:
+  - android-sdk
+  - flutter
+
+extensions:
+  - piper
+  - telegram
+  - whisper

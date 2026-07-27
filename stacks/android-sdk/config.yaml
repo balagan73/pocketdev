@@ -1,0 +1,4 @@
+# Android SDK stack configuration
+cmdline_tools_version: "11076708"
+android_platform_version: "36"
+android_build_tools_version: "36.0.0"

@@ -1,0 +1,13 @@
+# Telegram extension configuration
+# streaming_mode: progress | partial
+#   progress — draft shows a "working..." indicator; final answer is a single
+#              permanent message (avoids the flash-and-disappear effect).
+#   partial  — openclaw default; streams partial answer text into a draft
+#              message, then deletes it when the final answer arrives.
+streaming_mode: progress
+
+# tool_progress: true | false
+#   When streaming_mode is "progress", controls whether tool results (e.g.
+#   bash output) are also shown in the draft. false avoids the same
+#   flash-and-disappear effect for tool calls.
+tool_progress: false
