@@ -69,22 +69,25 @@ checkbox_select() {
     local -n _selected="$3"
     local n="${#_ids[@]}"
     local -a checked=()
-    local i cursor=0 key rest mark prefix
+    local i cursor=0 key rest mark prefix c1 c2
 
     for ((i = 0; i < n; i++)); do checked[i]=0; done
 
     echo -e "  (arrows or j/k to move, ${CYAN}space${RESET} to toggle, ${CYAN}enter${RESET} to confirm)"
     tput civis 2>/dev/null || true
 
-    local drawn=0
+    # Save the cursor position right before the first draw so every redraw
+    # can snap back here and erase everything below, instead of moving up
+    # by a fixed line count. A fixed count breaks as soon as any option's
+    # text wraps onto a second terminal row (long descriptions, narrow
+    # terminal): "up N lines" undershoots, lands mid-wrapped-line, and the
+    # old content is never cleared — it just looks like a duplicated line.
+    printf '\0337'
+
     while true; do
-        if [ "$drawn" -eq 1 ]; then
-            printf '\033[%dA' "$n"
-        fi
-        drawn=1
+        printf '\0338\033[J'
 
         for ((i = 0; i < n; i++)); do
-            printf '\033[2K\r'
             mark=" "
             prefix="  "
             [ "${checked[i]}" -eq 1 ] && mark="x"
@@ -101,7 +104,16 @@ checkbox_select() {
             break
         fi
         if [[ "$key" == $'\x1b' ]]; then
-            IFS= read -rsn2 -t 0.05 rest || true
+            # Read the rest of the CSI sequence one byte at a time; a generous
+            # per-byte timeout avoids losing arrow keys on laggy/remote ttys
+            # (e.g. VSCode's integrated terminal) where the '[' and letter
+            # can arrive a beat after the initial ESC byte.
+            IFS= read -rsn1 -t 0.5 c1 || true
+            rest="$c1"
+            if [ "$c1" = "[" ]; then
+                IFS= read -rsn1 -t 0.5 c2 || true
+                rest+="$c2"
+            fi
             key+="$rest"
         fi
 
