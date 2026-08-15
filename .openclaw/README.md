@@ -40,6 +40,26 @@ the operator's numeric Telegram ID (from
 [@userinfobot](https://t.me/userinfobot)) — see that task's steps to resume
 it.
 
+## GitHub CLI (gh)
+
+`gh` is installed in the base image so it's available to the agent for PRs,
+issues, and repo operations. It needs a one-time login per container (state
+persists in `.openclaw/data/gh/`, mounted from the persistent data volume, so
+you won't need to repeat this after restarts or rebuilds — only if that
+volume is wiped):
+
+```bash
+docker compose exec openclaw gh auth login
+```
+
+Answer the prompts: `GitHub.com` → `HTTPS` → `Login with a web browser`. It
+prints a one-time code and a `https://github.com/login/device` URL — open
+that URL on any device, paste the code, and approve. Verify with:
+
+```bash
+docker compose exec openclaw gh auth status
+```
+
 ## Voice transcription (faster-whisper)
 
 On first run, the entrypoint installs `faster-whisper` into a persistent venv,

@@ -27,6 +27,9 @@ services:
       - OPENCLAW_SKIP_ONBOARDING=true
       - OPENCLAW_CONFIG_DIR=/home/node/.openclaw
       - OPENCLAW_WORKSPACE_DIR=/workspace
+      # Keeps `gh auth login` state under the already-persisted data volume
+      # so it survives container restarts and rebuilds.
+      - GH_CONFIG_DIR=/home/node/.openclaw/gh
       # Block commits to main/master from inside this container only.
       - GIT_CONFIG_COUNT=1
       - GIT_CONFIG_KEY_0=core.hookspath
