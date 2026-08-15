@@ -33,6 +33,7 @@ HALLUCINATIONS = {"you", "thank you.", "thank you", "thanks.", "thanks", "bye.",
 model = WhisperModel("small", device="cpu", compute_type="int8", download_root=MODEL_DIR)
 segments, _ = model.transcribe(
     sys.argv[1],
+    language="en",
     vad_filter=True,
     vad_parameters={"min_speech_duration_ms": 250},
 )

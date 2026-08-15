@@ -178,3 +178,11 @@ Verify it worked with:
 docker compose exec openclaw python3 -c "import faster_whisper; print('ok')"
 docker compose exec openclaw node openclaw.mjs config get tools.media.audio
 ```
+
+Transcription is pinned to `language="en"` in `extensions/whisper/install.sh`
+(the `whisper-transcribe.py` heredoc) rather than left on auto-detect.
+Auto-detect can misfire on short or noisy clips and transcribe into the wrong
+language, which then makes the agent reply in that language too — and an
+English-only Piper voice just mangles non-English text into unintelligible
+audio instead of erroring. Change the `language="en"` argument there if you
+configure a non-English Piper voice.
