@@ -1,0 +1,15 @@
+# Discord voice extension configuration
+# voice_mode: stt-tts | agent-proxy
+#   stt-tts     — traditional pipeline: reuses the container's existing
+#                 whisper transcription (tools.media.audio) and TTS
+#                 (tts_provider below) — free, no external API keys.
+#   agent-proxy — lower-latency realtime voice via a hosted realtime
+#                 provider (e.g. OpenAI Realtime) — requires a paid API key;
+#                 do not switch to this without explicit spend approval
+#                 (see AGENTS.md "Existing Solutions Preflight").
+voice_mode: stt-tts
+
+# tts_provider: which entry under messages.tts.providers to use for voice
+# playback. Defaults to tts-local-cli (piper), already configured by the
+# piper extension — keeps voice replies fully local and free.
+tts_provider: tts-local-cli

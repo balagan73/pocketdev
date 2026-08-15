@@ -1,0 +1,3 @@
+name: discord-voice
+description: Discord voice channel — continuous Talk mode (stt-tts), reusing the container's local whisper transcription and piper TTS
+requires_rebuild: false
