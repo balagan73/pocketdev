@@ -4,7 +4,9 @@
 
 stacks:
   - android-sdk
+  - chrome
   - flutter
+  - linux-desktop
 
 extensions:
   - piper

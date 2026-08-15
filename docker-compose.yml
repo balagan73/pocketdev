@@ -14,7 +14,7 @@ services:
     build:
       context: .
       dockerfile: .openclaw/Dockerfile
-    container_name: pocketdev-openclaw
+    container_name: pocketdev
     restart: unless-stopped
     entrypoint: ["/bin/bash", "/oc-init/entrypoint.sh"]
     env_file:
