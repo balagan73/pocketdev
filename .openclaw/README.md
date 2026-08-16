@@ -163,6 +163,38 @@ piper-synthesized reply after whisper transcribes what you said. `/vc
 leave` ends the session. If it doesn't respond, check
 `docker compose logs openclaw` for errors.
 
+## Voice session reset
+
+The `voice-session-reset` extension lets you say a trigger phrase in the
+Discord voice channel (e.g. "start new session" or "reset chat") to reset
+that channel's session in place — no container or Gateway restart. It asks
+for confirmation before doing anything ("Want to start a new session? Say
+yes to confirm.").
+
+**One-time setup:** the reset goes through OpenClaw's `sessions.reset`
+Gateway RPC, which requires the in-container CLI device to hold the
+`operator.admin` scope (it only has `operator.write` by default). Grant it
+once:
+
+```bash
+docker compose exec openclaw node openclaw.mjs devices list --json
+```
+
+This prints a pending scope-upgrade request with a `requestId` (triggered by
+the first `sessions.reset`/`sessions.delete` attempt). Approve it:
+
+```bash
+docker compose exec openclaw node openclaw.mjs devices approve <requestId> --json
+```
+
+You may need to repeat the list/approve cycle once or twice — OpenClaw
+requests additional scopes (`operator.pairing`, then `operator.admin`)
+incrementally as each is needed. Once `openclaw devices list --json` shows
+`operator.admin` under the CLI device's `approvedScopes`, this step is done
+for good: the device keypair lives in `.openclaw/data/identity/device.json`,
+which is bind-mounted from the host repo, so the grant survives both
+`docker compose restart` and `docker compose up -d --build`.
+
 ## Voice transcription (faster-whisper)
 
 On first run, the entrypoint installs `faster-whisper` into a persistent venv,
