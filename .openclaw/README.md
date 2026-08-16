@@ -165,35 +165,38 @@ leave` ends the session. If it doesn't respond, check
 
 ## Voice session reset
 
-The `voice-session-reset` extension lets you say a trigger phrase in the
-Discord voice channel (e.g. "start new session" or "reset chat") to reset
-that channel's session in place — no container or Gateway restart. It asks
-for confirmation before doing anything ("Want to start a new session? Say
-yes to confirm.").
+Say a trigger phrase in the Discord voice channel (e.g. "start new session"
+or "reset chat") to reset that channel's session in place — no container or
+Gateway restart. It asks for confirmation first ("Want to start a new
+session? Say yes to confirm."); reply "yes" to reset, anything else keeps
+the session.
 
-**One-time setup:** the reset goes through OpenClaw's `sessions.reset`
-Gateway RPC, which requires the in-container CLI device to hold the
-`operator.admin` scope (it only has `operator.write` by default). Grant it
-once:
+**No setup needed.** This ships as part of the `discord-voice` extension, so
+selecting `discord-voice` installs it. The reset goes through OpenClaw's
+`sessions.reset` Gateway RPC, which needs the in-container CLI device to
+hold the `operator.admin` scope; the extension's install step requests and
+approves that scope automatically at container start, and the grant persists
+in the bind-mounted `.openclaw/data/`.
+
+**If the reset doesn't work,** check that the automatic bootstrap ran:
+
+```bash
+docker compose logs openclaw | grep voice-session-reset
+```
+
+Expect "Configured voice-session-reset plugin (allowConversationAccess)."
+and "voice-session-reset: operator.admin scope bootstrap done.". If the
+scope bootstrap didn't complete, grant it manually — list any pending
+scope-upgrade request, then approve it by `requestId`:
 
 ```bash
 docker compose exec openclaw node openclaw.mjs devices list --json
-```
-
-This prints a pending scope-upgrade request with a `requestId` (triggered by
-the first `sessions.reset`/`sessions.delete` attempt). Approve it:
-
-```bash
 docker compose exec openclaw node openclaw.mjs devices approve <requestId> --json
 ```
 
-You may need to repeat the list/approve cycle once or twice — OpenClaw
-requests additional scopes (`operator.pairing`, then `operator.admin`)
-incrementally as each is needed. Once `openclaw devices list --json` shows
-`operator.admin` under the CLI device's `approvedScopes`, this step is done
-for good: the device keypair lives in `.openclaw/data/identity/device.json`,
-which is bind-mounted from the host repo, so the grant survives both
-`docker compose restart` and `docker compose up -d --build`.
+You may need to repeat that cycle once or twice, since OpenClaw requests
+scopes (`operator.pairing`, then `operator.admin`) incrementally. It's done
+once the CLI device's `scopes` include `operator.admin`.
 
 ## Voice transcription (faster-whisper)
 
