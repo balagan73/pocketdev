@@ -1,5 +1,5 @@
 const TRIGGER_PATTERNS: RegExp[] = [
-  /\bstart\s+(?:a\s+)?new\s+session\b/i,
+  /\bstart\s+(?:a\s+|the\s+)?new\s+session\b/i,
   /\b(?:reset|restart)\s+(?:the\s+)?(?:chat|session)\b/i,
 ];
 

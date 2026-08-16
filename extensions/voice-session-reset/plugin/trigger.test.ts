@@ -34,6 +34,10 @@ test("matches 'restart chat'", () => {
   assert.equal(matchesTriggerPhrase("restart chat"), true);
 });
 
+test("matches 'start the new session'", () => {
+  assert.equal(matchesTriggerPhrase("start the new session"), true);
+});
+
 test("does not match unrelated text", () => {
   assert.equal(matchesTriggerPhrase("what's the weather today"), false);
 });
