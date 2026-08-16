@@ -59,30 +59,8 @@ node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
 { plugins: { entries: { "voice-session-reset": { hooks: { allowConversationAccess: true } } } } }
 JSONEOF
 
-# voice-session-reset needs the CLI device's operator.admin scope to call
-# sessions.reset — bootstrap it automatically instead of requiring manual
-# setup. Attempt a scope-checked call (a harmless reset against a
-# never-real session key); this triggers a pending scope-upgrade request
-# if the scope is missing. Extract the requestId and approve it, then
-# retry — scopes escalate incrementally (operator.pairing, then
-# operator.admin), so loop a few rounds. Once the scope is already
-# granted (every run after the first), the very first attempt succeeds
-# and the loop exits immediately — this is safe to run on every
-# container start. This auto-approves a request from the container's own
-# CLI device only; the container is already the entire trust boundary
-# (see docs/superpowers/specs/2026-07-21-flutter-openclaw-container-design.md),
-# so this doesn't cross a real security boundary.
-BOOTSTRAP_KEY="agent:main:__voice-session-reset-scope-bootstrap__"
-for _ in 1 2 3 4; do
-    if OUTPUT=$(node openclaw.mjs gateway call sessions.reset --json --params "{\"key\":\"$BOOTSTRAP_KEY\"}" 2>&1); then
-        break
-    fi
-    REQUEST_ID=$(echo "$OUTPUT" | grep -oE 'requestId: [a-f0-9-]+' | head -1 | awk '{print $2}' || true)
-    if [ -n "$REQUEST_ID" ]; then
-        node openclaw.mjs devices approve "$REQUEST_ID" >/dev/null 2>&1 || true
-    else
-        break
-    fi
-done
-node openclaw.mjs gateway call sessions.delete --json --params "{\"key\":\"$BOOTSTRAP_KEY\"}" >/dev/null 2>&1 || true
-echo "voice-session-reset: operator.admin scope bootstrap done."
+# NOTE: the operator.admin scope grant that voice-session-reset needs is NOT
+# done here. This script runs during the entrypoint's extension-install loop,
+# which completes before the entrypoint execs the Gateway — so no Gateway is
+# listening yet and a `gateway call` here cannot work. The plugin performs the
+# bootstrap itself from its `gateway_start` hook instead.

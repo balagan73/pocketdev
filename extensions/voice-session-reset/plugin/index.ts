@@ -2,6 +2,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { matchesTriggerPhrase } from "./trigger.ts";
 import { classifyReply, PendingConfirmations } from "./confirmation.ts";
 import { buildResetCommand } from "./reset-command.ts";
+import { bootstrapOperatorAdminScope } from "./scope-bootstrap.ts";
 
 const pending = new PendingConfirmations();
 const CONFIRM_MESSAGE = "Want to start a new session? Say yes to confirm.";
@@ -10,6 +11,27 @@ export default definePluginEntry({
   id: "voice-session-reset",
   name: "Voice Session Reset",
   register(api) {
+    // The operator.admin scope grant that sessions.reset needs can only be
+    // requested once the Gateway is actually listening, so it runs here
+    // rather than in the extension's install.sh — that script completes
+    // before the entrypoint execs the Gateway, when no RPC can succeed.
+    api.on("gateway_start", async () => {
+      try {
+        await bootstrapOperatorAdminScope(
+          (args) => api.runtime.system.runCommandWithTimeout(["openclaw", ...args], {
+            timeoutMs: 10_000,
+          }),
+          api.logger,
+        );
+      } catch (err) {
+        api.logger.warn(
+          `voice-session-reset: operator.admin scope bootstrap threw err=${JSON.stringify(
+            String(err),
+          )}`,
+        );
+      }
+    });
+
     api.on(
       "before_agent_run",
       async (event, ctx) => {

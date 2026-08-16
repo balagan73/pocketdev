@@ -174,20 +174,20 @@ the session.
 **No setup needed.** This ships as part of the `discord-voice` extension, so
 selecting `discord-voice` installs it. The reset goes through OpenClaw's
 `sessions.reset` Gateway RPC, which needs the in-container CLI device to
-hold the `operator.admin` scope; the extension's install step requests and
-approves that scope automatically at container start, and the grant persists
-in the bind-mounted `.openclaw/data/`.
+hold the `operator.admin` scope; the plugin requests and approves that scope
+automatically once the Gateway starts, and the grant persists in the
+bind-mounted `.openclaw/data/`.
 
-**If the reset doesn't work,** check that the automatic bootstrap ran:
+**If the reset doesn't work,** check what the automatic bootstrap reported:
 
 ```bash
 docker compose logs openclaw | grep voice-session-reset
 ```
 
-Expect "Configured voice-session-reset plugin (allowConversationAccess)."
-and "voice-session-reset: operator.admin scope bootstrap done.". If the
-scope bootstrap didn't complete, grant it manually — list any pending
-scope-upgrade request, then approve it by `requestId`:
+Expect "voice-session-reset: operator.admin scope bootstrap succeeded.". If
+you instead see "...did not complete after retries...", or no bootstrap line
+at all, grant the scope manually — list any pending scope-upgrade request,
+then approve it by `requestId`:
 
 ```bash
 docker compose exec openclaw node openclaw.mjs devices list --json
