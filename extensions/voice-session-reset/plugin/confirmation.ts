@@ -14,7 +14,21 @@ export function matchesNegative(text: string): boolean {
   return NEGATIVE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-const DEFAULT_TTL_MS = 20_000;
+export type ReplyClassification = "yes" | "no";
+
+// A reply counts as "yes" only when it matches an affirmative pattern and no
+// negative pattern. "no, don't do it" matches both (it contains "no" and
+// "do it") and must NOT reset. Anything else — pure negative, ambiguous
+// (both or neither matched), unrelated — is "no", matching the spec's
+// "negative or anything else" rule: both are treated identically.
+export function classifyReply(text: string): ReplyClassification {
+  if (matchesAffirmative(text) && !matchesNegative(text)) {
+    return "yes";
+  }
+  return "no";
+}
+
+const DEFAULT_TTL_MS = 30_000;
 
 type PendingEntry = {
   expiresAt: number;
