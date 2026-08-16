@@ -1,0 +1,12 @@
+{
+  "id": "voice-session-reset",
+  "name": "Voice Session Reset",
+  "description": "Detects a voice trigger phrase in a Discord channel session, confirms with the user, and resets the session in place.",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}
