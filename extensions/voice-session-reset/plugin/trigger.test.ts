@@ -22,6 +22,18 @@ test("is case-insensitive", () => {
   assert.equal(matchesTriggerPhrase("START NEW SESSION"), true);
 });
 
+test("matches 'restart the session'", () => {
+  assert.equal(matchesTriggerPhrase("restart the session"), true);
+});
+
+test("matches 'restart session' without 'the'", () => {
+  assert.equal(matchesTriggerPhrase("please restart session"), true);
+});
+
+test("matches 'restart chat'", () => {
+  assert.equal(matchesTriggerPhrase("restart chat"), true);
+});
+
 test("does not match unrelated text", () => {
   assert.equal(matchesTriggerPhrase("what's the weather today"), false);
 });
