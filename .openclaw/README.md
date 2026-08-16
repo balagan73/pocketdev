@@ -165,11 +165,14 @@ leave` ends the session. If it doesn't respond, check
 
 ## Voice session reset
 
-Say a trigger phrase in the Discord voice channel (e.g. "start new session"
-or "reset chat") to reset that channel's session in place — no container or
+Say a trigger phrase in the Discord voice channel (e.g. "start new session",
+"reset chat", "restart the conversation", "wipe this chat", or "forget this
+conversation") to reset that channel's session in place — no container or
 Gateway restart. It asks for confirmation first ("Want to start a new
 session? Say yes to confirm."); reply "yes" to reset, anything else keeps
-the session.
+the session. This is intercepted directly from the raw message text before
+the model ever runs, so it doesn't depend on the model choosing to do
+anything.
 
 **No setup needed.** This ships as part of the `discord-voice` extension, so
 selecting `discord-voice` installs it. The reset goes through OpenClaw's
