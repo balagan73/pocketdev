@@ -3,6 +3,7 @@ import { matchesTriggerPhrase } from "./trigger.ts";
 import { classifyReply, PendingConfirmations } from "./confirmation.ts";
 import { buildResetCommand } from "./reset-command.ts";
 import { bootstrapOperatorAdminScope } from "./scope-bootstrap.ts";
+import { extractUserUtterance } from "./prompt-text.ts";
 
 const pending = new PendingConfirmations();
 const CONFIRM_MESSAGE = "Want to start a new session? Say yes to confirm.";
@@ -32,18 +33,19 @@ export default definePluginEntry({
       }
     });
 
+    // A direct text-phrase match arms `pending` here — this is the ONLY
+    // trigger, and the only place a reset actually happens. It intercepts
+    // before the model ever runs, so it doesn't depend on the model
+    // choosing to call any tool.
     api.on(
       "before_agent_run",
       async (event, ctx) => {
         if (ctx?.channel !== "discord") return;
         const sessionKey = ctx?.sessionKey;
         if (!sessionKey) return;
-        const text = event?.prompt ?? "";
+        const text = extractUserUtterance(event?.prompt ?? "");
 
-        if (pending.isPending(sessionKey)) {
-          // Repeating the trigger phrase while a confirmation is pending
-          // just re-asks and resets the TTL, rather than being treated as
-          // an ambiguous (and therefore cancelling) reply.
+        if (!pending.isPending(sessionKey)) {
           if (matchesTriggerPhrase(text)) {
             pending.start(sessionKey);
             return {
@@ -52,70 +54,62 @@ export default definePluginEntry({
               message: CONFIRM_MESSAGE,
             };
           }
+          return;
+        }
 
-          pending.clear(sessionKey);
+        pending.clear(sessionKey);
 
-          if (classifyReply(text) === "yes") {
-            const { cmd, args } = buildResetCommand(sessionKey);
-            let result;
-            try {
-              result = await api.runtime.system.runCommandWithTimeout([cmd, ...args], {
-                timeoutMs: 10_000,
-              });
-            } catch (err) {
-              api.logger.error(
-                `voice-session-reset: reset command threw sessionKey=${JSON.stringify(
-                  sessionKey,
-                )} err=${JSON.stringify(String(err))}`,
-              );
-              return {
-                outcome: "block",
-                reason: "voice-session-reset-failed",
-                message: "Couldn't reset the session, sorry — try again in a bit.",
-              };
-            }
-            if (result.code !== 0) {
-              // NOTE: api.logger.error(message, meta) silently drops the
-              // `meta` object for this plugin/runtime combination (same
-              // subsystem-logger behavior documented for .info() and .error()
-              // in task-5-report.md). Interpolate diagnostic fields into the
-              // message string itself so they actually reach the log.
-              api.logger.error(
-                `voice-session-reset: reset command failed sessionKey=${JSON.stringify(
-                  sessionKey,
-                )} code=${JSON.stringify(result.code)} stderr=${JSON.stringify(result.stderr)}`,
-              );
-              return {
-                outcome: "block",
-                reason: "voice-session-reset-failed",
-                message: "Couldn't reset the session, sorry — try again in a bit.",
-              };
-            }
+        if (classifyReply(text) === "yes") {
+          const { cmd, args } = buildResetCommand(sessionKey);
+          let result;
+          try {
+            result = await api.runtime.system.runCommandWithTimeout([cmd, ...args], {
+              timeoutMs: 10_000,
+            });
+          } catch (err) {
+            api.logger.error(
+              `voice-session-reset: reset command threw sessionKey=${JSON.stringify(
+                sessionKey,
+              )} err=${JSON.stringify(String(err))}`,
+            );
             return {
               outcome: "block",
-              reason: "voice-session-reset-confirmed",
-              message: "Starting fresh.",
+              reason: "voice-session-reset-failed",
+              message: "Couldn't reset the session, sorry — try again in a bit.",
             };
           }
-
-          // "no", or anything ambiguous — per the design, both are treated
-          // the same: cancel, and don't let the utterance reach the model as
-          // if it were real conversation content.
+          if (result.code !== 0) {
+            // NOTE: api.logger.error(message, meta) silently drops the
+            // `meta` object for this plugin/runtime combination (same
+            // subsystem-logger behavior documented for .info() and .error()
+            // in task-5-report.md). Interpolate diagnostic fields into the
+            // message string itself so they actually reach the log.
+            api.logger.error(
+              `voice-session-reset: reset command failed sessionKey=${JSON.stringify(
+                sessionKey,
+              )} code=${JSON.stringify(result.code)} stderr=${JSON.stringify(result.stderr)}`,
+            );
+            return {
+              outcome: "block",
+              reason: "voice-session-reset-failed",
+              message: "Couldn't reset the session, sorry — try again in a bit.",
+            };
+          }
           return {
             outcome: "block",
-            reason: "voice-session-reset-cancelled",
-            message: "Okay, keeping this session.",
+            reason: "voice-session-reset-confirmed",
+            message: "Starting fresh.",
           };
         }
 
-        if (matchesTriggerPhrase(text)) {
-          pending.start(sessionKey);
-          return {
-            outcome: "block",
-            reason: "voice-session-reset-confirm",
-            message: CONFIRM_MESSAGE,
-          };
-        }
+        // "no", or anything ambiguous — per the design, both are treated
+        // the same: cancel, and don't let the utterance reach the model as
+        // if it were real conversation content.
+        return {
+          outcome: "block",
+          reason: "voice-session-reset-cancelled",
+          message: "Okay, keeping this session.",
+        };
       },
       { priority: 50 },
     );
