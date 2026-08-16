@@ -25,11 +25,16 @@ export default definePluginEntry({
               timeoutMs: 10_000,
             });
             if (result.code !== 0) {
-              api.logger.error("voice-session-reset: reset command failed", {
-                sessionKey,
-                code: result.code,
-                stderr: result.stderr,
-              });
+              // NOTE: api.logger.error(message, meta) silently drops the `meta`
+              // object for this plugin/runtime combination (same subsystem-logger
+              // behavior documented for .info() in task-5-report.md, Deviation 2).
+              // Interpolate the diagnostic fields into the message string itself
+              // so they actually reach the persisted log on a reset failure.
+              api.logger.error(
+                `voice-session-reset: reset command failed sessionKey=${JSON.stringify(
+                  sessionKey,
+                )} code=${JSON.stringify(result.code)} stderr=${JSON.stringify(result.stderr)}`,
+              );
               return {
                 outcome: "block",
                 reason: "voice-session-reset-failed",
