@@ -1,0 +1,17 @@
+{
+  "name": "voice-session-reset",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.6.33"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  }
+}

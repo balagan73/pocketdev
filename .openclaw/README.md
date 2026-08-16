@@ -163,6 +163,44 @@ piper-synthesized reply after whisper transcribes what you said. `/vc
 leave` ends the session. If it doesn't respond, check
 `docker compose logs openclaw` for errors.
 
+## Voice session reset
+
+Say a trigger phrase in the Discord voice channel (e.g. "start new session",
+"reset chat", "restart the conversation", "wipe this chat", or "forget this
+conversation") to reset that channel's session in place — no container or
+Gateway restart. It asks for confirmation first ("Want to start a new
+session? Say yes to confirm."); reply "yes" to reset, anything else keeps
+the session. This is intercepted directly from the raw message text before
+the model ever runs, so it doesn't depend on the model choosing to do
+anything.
+
+**No setup needed.** This ships as part of the `discord-voice` extension, so
+selecting `discord-voice` installs it. The reset goes through OpenClaw's
+`sessions.reset` Gateway RPC, which needs the in-container CLI device to
+hold the `operator.admin` scope; the plugin requests and approves that scope
+automatically once the Gateway starts, and the grant persists in the
+bind-mounted `.openclaw/data/`.
+
+**If the reset doesn't work,** check what the automatic bootstrap reported:
+
+```bash
+docker compose logs openclaw | grep voice-session-reset
+```
+
+Expect "voice-session-reset: operator.admin scope bootstrap succeeded.". If
+you instead see "...did not complete after retries...", or no bootstrap line
+at all, grant the scope manually — list any pending scope-upgrade request,
+then approve it by `requestId`:
+
+```bash
+docker compose exec openclaw node openclaw.mjs devices list --json
+docker compose exec openclaw node openclaw.mjs devices approve <requestId> --json
+```
+
+You may need to repeat that cycle once or twice, since OpenClaw requests
+scopes (`operator.pairing`, then `operator.admin`) incrementally. It's done
+once the CLI device's `scopes` include `operator.admin`.
+
 ## Voice transcription (faster-whisper)
 
 On first run, the entrypoint installs `faster-whisper` into a persistent venv,

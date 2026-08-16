@@ -36,3 +36,31 @@ node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
   || echo "Warning: failed to configure Discord voice mode"
 { channels: { discord: { voice: { enabled: true, mode: "$VOICE_MODE", tts: { provider: "$TTS_PROVIDER" } } } } }
 JSONEOF
+
+# --- Voice session reset (bundled with discord-voice — meaningless on its
+# own, so not its own selectable extension) ---
+#
+# Installs the local voice-session-reset plugin (lets a user say a trigger
+# phrase in the voice channel to reset the session in place, with
+# confirmation — no container/Gateway restart needed for the reset itself)
+# and enables the conversation-access hook it needs. Installed from the
+# bind-mounted repo path (/workspace), not a baked image path, so this
+# extension keeps the same "restart only, no rebuild" guarantee as every
+# other extension.
+if ! node openclaw.mjs plugins list 2>/dev/null | grep -qi voice-session-reset; then
+    node openclaw.mjs plugins install --link /workspace/extensions/voice-session-reset/plugin >/dev/null 2>&1 \
+      && echo "Installed voice-session-reset plugin." \
+      || echo "Warning: failed to install voice-session-reset plugin"
+fi
+
+node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
+  && echo "Configured voice-session-reset plugin (allowConversationAccess)." \
+  || echo "Warning: failed to configure voice-session-reset plugin"
+{ plugins: { entries: { "voice-session-reset": { hooks: { allowConversationAccess: true } } } } }
+JSONEOF
+
+# NOTE: the operator.admin scope grant that voice-session-reset needs is NOT
+# done here. This script runs during the entrypoint's extension-install loop,
+# which completes before the entrypoint execs the Gateway — so no Gateway is
+# listening yet and a `gateway call` here cannot work. The plugin performs the
+# bootstrap itself from its `gateway_start` hook instead.
