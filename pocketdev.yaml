@@ -12,5 +12,4 @@ extensions:
   - discord-voice
   - piper
   - telegram
-  - voice-session-reset
   - whisper
