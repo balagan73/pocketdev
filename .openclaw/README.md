@@ -225,6 +225,56 @@ English-only Piper voice just mangles non-English text into unintelligible
 audio instead of erroring. Change the `language="en"` argument there if you
 configure a non-English Piper voice.
 
+## Usage metrics (per-agent token/cost tracking)
+
+Each end user gets their own OpenClaw agent bound to their own Discord bot
+(see "Per-user onboarding" below), so per-agent usage is per-user usage.
+The `usage-metrics` extension enables OpenClaw's built-in
+`diagnostics-prometheus` plugin — no custom token-counting code — and an
+optional Prometheus + Grafana overlay visualizes it.
+
+Bring up the metrics stack alongside the base container:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
+```
+
+Grafana: `http://localhost:3000` (default login `admin`/`admin`, change on
+first login). Open the "Usage per agent" dashboard for token totals
+broken out by agent, over any selected time range.
+
+**First-ever container start only:** the extension writes Prometheus's
+scrape token from `OPENCLAW_GATEWAY_TOKEN`, but that token is generated
+*after* extensions run on a brand-new container. If `docker compose logs
+openclaw | grep "Prometheus scrape token"` shows the "not yet generated"
+warning, run `docker compose restart` once more — every subsequent start
+picks it up fine.
+
+**Cost tracking isn't available yet.** The `diagnostics-prometheus` plugin
+doesn't currently export a cost metric, so the dashboard shows token counts
+only. This can be revisited if a future plugin version adds cost export.
+
+### Per-user onboarding
+
+1. Create a new Discord application/bot for the patron (same steps as
+   "Discord voice" above).
+2. Create their isolated agent and bind it to their bot:
+   ```bash
+   docker compose exec openclaw node openclaw.mjs agents add <userId>
+   docker compose exec openclaw node openclaw.mjs agents bind --agent <userId> --bind discord:<accountId>
+   ```
+3. Their usage now appears automatically as a new series labeled by `agent`
+   in the dashboard — no metrics code to touch.
+
+### Testing without a Discord bot
+
+`openclaw agent --agent <id> --message "..."` runs a turn through the
+Gateway for any agent, bypassing channel routing entirely — useful for
+exercising the metrics pipeline without provisioning a real bot per test
+agent (see the spec's "Interim testing note" for why this matters before
+a metered API key is wired in:
+`docs/superpowers/specs/2026-09-11-per-user-usage-tracking-design.md`).
+
 ## Updating OpenClaw
 
 `.openclaw/Dockerfile` pins `FROM ghcr.io/openclaw/openclaw:<version>` to an
