@@ -24,3 +24,6 @@
 # Planning/process docs (specs, plans) — scratch, not committed
 /docs/superpowers/specs/
 /docs/superpowers/plans/
+
+# Subagent-driven-development workspaces (ledgers, briefs, reports, backups) — scratch
+/.superpowers/
