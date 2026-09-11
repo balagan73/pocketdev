@@ -233,15 +233,30 @@ The `usage-metrics` extension enables OpenClaw's built-in
 `diagnostics-prometheus` plugin — no custom token-counting code — and an
 optional Prometheus + Grafana overlay visualizes it.
 
+The `usage-metrics` extension must be selected (via `./setup.sh`, or present
+in `pocketdev.yaml`) before bringing up this overlay — otherwise Prometheus
+gets 401s from the gateway, since no scrape token was ever written.
+
 Bring up the metrics stack alongside the base container:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
 ```
 
-Grafana: `http://localhost:3000` (default login `admin`/`admin`, change on
-first login). Open the "Usage per agent" dashboard for token totals
-broken out by agent, over any selected time range.
+Both services publish to loopback only (`127.0.0.1`), matching this
+deployment's trust model — the container (and now the metrics overlay) is
+reachable from this host only, never from other machines on the LAN, even
+though `localhost` still resolves to it locally.
+
+Grafana: `http://localhost:3000`. Default login is `admin`/`admin` unless
+you set `GRAFANA_ADMIN_PASSWORD` in `.env` or the shell environment before
+`docker compose up` — do that for a real deployment instead of relying on
+Grafana's first-login change-password prompt. Open the "Usage per agent"
+dashboard for token totals broken out by agent, over any selected time
+range.
+
+Prometheus: `http://localhost:9090`, loopback-only, no authentication —
+treat it the same as the gateway itself from a trust standpoint.
 
 **First-ever container start only:** the extension writes Prometheus's
 scrape token from `OPENCLAW_GATEWAY_TOKEN`, but that token is generated

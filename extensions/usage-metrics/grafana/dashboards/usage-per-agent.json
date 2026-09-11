@@ -16,7 +16,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (agent) (openclaw_model_tokens_total)",
+          "expr": "sum by (agent) (openclaw_model_tokens_total{token_type!~\"total|prompt\"})",
           "legendFormat": "{{agent}}",
           "refId": "A"
         }
@@ -30,7 +30,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (agent, model, token_type) (increase(openclaw_model_tokens_total{token_type=~\"input|output|cache_read|cache_write\"}[$__range]))",
+          "expr": "sum by (agent, model, token_type) (increase(openclaw_model_tokens_total{token_type!~\"total|prompt\"}[$__range]))",
           "instant": true,
           "format": "table",
           "refId": "A"

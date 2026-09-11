@@ -23,6 +23,19 @@ NEW_IMAGE="ghcr.io/openclaw/openclaw:${TARGET_VERSION}"
 CURRENT_IMAGE="$(awk '/^FROM /{print $2; exit}' .openclaw/Dockerfile)"
 BACKUP_DIR="${OPENCLAW_BACKUP_DIR:-$HOME/backups/pocketdev}"
 
+# From here on, any failure (via set -e) should restore the original
+# Dockerfile pin rather than leave it bumped with no rollback.
+ROLLBACK_NEEDED=1
+rollback_on_failure() {
+    if [ "$ROLLBACK_NEEDED" = "1" ]; then
+        echo
+        echo "=== FAILED: rolling back .openclaw/Dockerfile to $CURRENT_IMAGE ===" >&2
+        sed -i "0,/^FROM /s#^FROM .*#FROM ${CURRENT_IMAGE}#" .openclaw/Dockerfile
+        echo "Rolled back. Your original pin is restored; the gateway container itself may still need manual attention — check 'docker compose ps' and the backup noted above." >&2
+    fi
+}
+trap rollback_on_failure EXIT
+
 echo "=== pocket-dev: update-openclaw ==="
 echo "Current pin: $CURRENT_IMAGE"
 echo "Target:      $NEW_IMAGE"
@@ -48,7 +61,7 @@ echo "Backup saved to $BACKUP_DIR/$(basename "$BACKUP_ARCHIVE")"
 
 echo
 echo "=== Step 2/8: pin the new version in the Dockerfile ==="
-sed -i "s#^FROM .*#FROM ${NEW_IMAGE}#" .openclaw/Dockerfile
+sed -i "0,/^FROM /s#^FROM .*#FROM ${NEW_IMAGE}#" .openclaw/Dockerfile
 grep '^FROM ' .openclaw/Dockerfile
 
 echo
@@ -106,6 +119,8 @@ echo
 echo "=== Step 8/8: verify ==="
 docker compose exec -T openclaw node openclaw.mjs --version
 docker compose exec -T openclaw node openclaw.mjs status --deep --timeout 15000
+
+ROLLBACK_NEEDED=0
 
 echo
 echo "=== pocket-dev: update complete ==="

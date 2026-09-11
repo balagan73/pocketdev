@@ -11,10 +11,11 @@ services:
     image: prom/prometheus:v2.55.1
     container_name: pocketdev-prometheus
     restart: unless-stopped
-    # Port 9090 is mapped to the host for verification and local access; Grafana (Task 3)
-    # will access Prometheus over the compose network at http://prometheus:9090.
+    # Port 9090 is mapped to the host (loopback-only) for verification and local
+    # access; Grafana will access Prometheus over the compose network at
+    # http://prometheus:9090.
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./extensions/usage-metrics/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./.openclaw/data/prometheus-scrape-token:/etc/prometheus/openclaw-token:ro
@@ -27,7 +28,12 @@ services:
     container_name: pocketdev-grafana
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
+    # Overrides Grafana's default admin password. Set GRAFANA_ADMIN_PASSWORD
+    # in .env or the shell environment before `docker compose up` for a real
+    # deployment; falls back to Grafana's default "admin" if unset.
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
       - ./extensions/usage-metrics/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./extensions/usage-metrics/grafana/dashboards:/var/lib/grafana/dashboards:ro

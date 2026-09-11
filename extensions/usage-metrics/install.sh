@@ -37,10 +37,22 @@ JSONEOF
 # it up — see .openclaw/README.md's "Usage metrics" section.
 OPENCLAW_ENV="/home/node/.openclaw/.env"
 TOKEN_FILE="/home/node/.openclaw/prometheus-scrape-token"
+
+# If nothing has ever written the token file, Docker may have auto-created a
+# directory at this bind-mount source (standard Docker behavior when the
+# bind-mount source path doesn't exist yet at container start). Clear that
+# out first so the writes below always land on a real file, never fail with
+# "Is a directory".
+[ -d "$TOKEN_FILE" ] && rm -rf "$TOKEN_FILE"
+
 if [ -f "$OPENCLAW_ENV" ] && grep -q "^OPENCLAW_GATEWAY_TOKEN=" "$OPENCLAW_ENV"; then
     grep "^OPENCLAW_GATEWAY_TOKEN=" "$OPENCLAW_ENV" | cut -d= -f2- > "$TOKEN_FILE"
     chmod 644 "$TOKEN_FILE"
     echo "Wrote Prometheus scrape token."
 else
+    # Still leave a real (empty) file at TOKEN_FILE so Docker's bind mount
+    # always finds a file, never a directory, regardless of startup order.
+    : > "$TOKEN_FILE"
+    chmod 644 "$TOKEN_FILE"
     echo "Warning: OPENCLAW_GATEWAY_TOKEN not yet generated — Prometheus scrape token not written this run. Restart once more after it exists."
 fi

@@ -1,3 +1,3 @@
 name: usage-metrics
-description: Per-agent token/cost usage metrics via OpenClaw's built-in diagnostics-prometheus plugin
+description: Per-agent token usage metrics via OpenClaw's built-in diagnostics-prometheus plugin
 requires_rebuild: false
