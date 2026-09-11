@@ -12,4 +12,5 @@ extensions:
   - discord-voice
   - piper
   - telegram
+  - usage-metrics
   - whisper
