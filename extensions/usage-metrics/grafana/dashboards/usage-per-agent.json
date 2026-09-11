@@ -45,7 +45,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (agent) (\n  increase(openclaw_model_tokens_total{token_type=\"input\"}[$__interval])\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"output\"}[$__interval]) * 5)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_write\"}[$__interval]) * 1.25)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_read\"}[$__interval]) * 0.1)\n)",
+          "expr": "sum by (agent) (\n  (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__interval]))) * 1\n  + (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"output\"}[$__interval])) or sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__interval]) * 0)) * 5\n  + (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"cache_write\"}[$__interval])) or sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__interval]) * 0)) * 1.25\n  + (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"cache_read\"}[$__interval])) or sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__interval]) * 0)) * 0.1\n)",
           "legendFormat": "{{agent}}",
           "interval": "1m",
           "refId": "A"
@@ -54,13 +54,13 @@
     },
     {
       "id": 4,
-      "title": "Relative cost units (selected time range), by agent",
+      "title": "Relative cost units (selected time range), by agent (input=1x, output=5x, cache_write=1.25x, cache_read=0.1x)",
       "type": "table",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (agent) (\n  increase(openclaw_model_tokens_total{token_type=\"input\"}[$__range])\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"output\"}[$__range]) * 5)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_write\"}[$__range]) * 1.25)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_read\"}[$__range]) * 0.1)\n)",
+          "expr": "sum by (agent) (\n  (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__range]))) * 1\n  + (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"output\"}[$__range])) or sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__range]) * 0)) * 5\n  + (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"cache_write\"}[$__range])) or sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__range]) * 0)) * 1.25\n  + (sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"cache_read\"}[$__range])) or sum by (agent) (increase(openclaw_model_tokens_total{token_type=\"input\"}[$__range]) * 0)) * 0.1\n)",
           "instant": true,
           "format": "table",
           "refId": "A"
