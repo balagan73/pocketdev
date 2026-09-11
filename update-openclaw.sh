@@ -43,6 +43,7 @@ echo
 
 if [ "$CURRENT_IMAGE" = "$NEW_IMAGE" ]; then
     echo "Already pinned to $NEW_IMAGE. Nothing to do."
+    ROLLBACK_NEEDED=0
     exit 0
 fi
 
