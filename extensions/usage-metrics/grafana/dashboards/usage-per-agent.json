@@ -1,0 +1,41 @@
+{
+  "id": null,
+  "uid": "usage-per-agent",
+  "title": "Usage per agent",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-7d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tokens over time, by agent",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (agent) (openclaw_model_tokens_total)",
+          "legendFormat": "{{agent}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Tokens used (selected time range), by agent",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (agent) (increase(openclaw_model_tokens_total[$__range]))",
+          "instant": true,
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

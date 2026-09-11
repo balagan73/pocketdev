@@ -22,5 +22,19 @@ services:
     depends_on:
       - openclaw
 
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: pocketdev-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./extensions/usage-metrics/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./extensions/usage-metrics/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   prometheus-data:
+  grafana-data:
