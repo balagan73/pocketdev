@@ -36,6 +36,35 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 3,
+      "title": "Relative cost units over time, by agent (input=1x, output=5x, cache_write=1.25x, cache_read=0.1x)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (agent) (\n  increase(openclaw_model_tokens_total{token_type=\"input\"}[$__interval])\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"output\"}[$__interval]) * 5)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_write\"}[$__interval]) * 1.25)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_read\"}[$__interval]) * 0.1)\n)",
+          "legendFormat": "{{agent}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Relative cost units (selected time range), by agent",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (agent) (\n  increase(openclaw_model_tokens_total{token_type=\"input\"}[$__range])\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"output\"}[$__range]) * 5)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_write\"}[$__range]) * 1.25)\n  + ignoring(token_type) (increase(openclaw_model_tokens_total{token_type=\"cache_read\"}[$__range]) * 0.1)\n)",
+          "instant": true,
+          "format": "table",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
