@@ -11,6 +11,8 @@ services:
     image: prom/prometheus:v2.55.1
     container_name: pocketdev-prometheus
     restart: unless-stopped
+    # Port 9090 is mapped to the host for verification and local access; Grafana (Task 3)
+    # will access Prometheus over the compose network at http://prometheus:9090.
     ports:
       - "9090:9090"
     volumes:

@@ -39,7 +39,7 @@ OPENCLAW_ENV="/home/node/.openclaw/.env"
 TOKEN_FILE="/home/node/.openclaw/prometheus-scrape-token"
 if [ -f "$OPENCLAW_ENV" ] && grep -q "^OPENCLAW_GATEWAY_TOKEN=" "$OPENCLAW_ENV"; then
     grep "^OPENCLAW_GATEWAY_TOKEN=" "$OPENCLAW_ENV" | cut -d= -f2- > "$TOKEN_FILE"
-    chmod 600 "$TOKEN_FILE"
+    chmod 644 "$TOKEN_FILE"
     echo "Wrote Prometheus scrape token."
 else
     echo "Warning: OPENCLAW_GATEWAY_TOKEN not yet generated — Prometheus scrape token not written this run. Restart once more after it exists."
