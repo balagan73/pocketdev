@@ -24,13 +24,13 @@
     },
     {
       "id": 2,
-      "title": "Tokens used (selected time range), by agent",
+      "title": "Tokens used (selected time range), by agent/model/type",
       "type": "table",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (agent) (increase(openclaw_model_tokens_total[$__range]))",
+          "expr": "sum by (agent, model, token_type) (increase(openclaw_model_tokens_total{token_type=~\"input|output|cache_read|cache_write\"}[$__range]))",
           "instant": true,
           "format": "table",
           "refId": "A"
