@@ -1,4 +1,8 @@
-FROM ghcr.io/openclaw/openclaw:latest
+# Pinned, not :latest — see update-openclaw.sh for the safe way to bump
+# this. An unpinned tag can silently jump several releases on a rebuild,
+# which can break externally-installed (ClawHub/npm) plugins and require
+# a state migration; see .openclaw/README.md's "Updating OpenClaw" section.
+FROM ghcr.io/openclaw/openclaw:2026.9.4
 
 # Copy pocket-dev orchestration files into the image
 COPY pocketdev.yaml /pocket-dev/pocketdev.yaml

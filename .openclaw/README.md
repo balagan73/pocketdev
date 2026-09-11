@@ -224,3 +224,32 @@ language, which then makes the agent reply in that language too — and an
 English-only Piper voice just mangles non-English text into unintelligible
 audio instead of erroring. Change the `language="en"` argument there if you
 configure a non-English Piper voice.
+
+## Updating OpenClaw
+
+`.openclaw/Dockerfile` pins `FROM ghcr.io/openclaw/openclaw:<version>` to an
+exact version — not `:latest`. A plain `./rebuild.sh` only pulls that base
+image the first time it's ever built on a machine; after that it reuses the
+locally cached image indefinitely, so the pin never drifts on its own and
+`rebuild.sh` never silently jumps versions.
+
+To move to a newer version, run:
+
+```bash
+./update-openclaw.sh <version>   # e.g. ./update-openclaw.sh 2026.10.1
+```
+
+This isn't just a rebuild — a core version jump can require a state
+migration before the gateway will even start, and it can break
+externally-installed (ClawHub/npm) plugins whose compiled code no longer
+matches the new core's internals, even though bundled plugins never have
+this problem. The script: backs up real state (verified) to
+`~/backups/pocketdev/` (override with `OPENCLAW_BACKUP_DIR`), updates the
+Dockerfile pin, rebuilds, stops the gateway cleanly, runs `doctor --fix` in
+isolation against the real state, brings the gateway back up, updates any
+externally-installed plugins (currently `discord`, `usage-metrics`'s
+`diagnostics-prometheus`), and finishes with a `status --deep` check.
+
+Read its output — it confirms the gateway responds, but whether each
+channel (Discord/Telegram/etc.) actually works again needs a human look at
+that status output, same as any upgrade.
