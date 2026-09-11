@@ -1,0 +1,24 @@
+# Optional overlay: adds Prometheus + Grafana for per-agent usage dashboards.
+# Requires the `usage-metrics` extension selected in pocketdev.yaml (it
+# writes the token file mounted below) and the base `openclaw` service
+# already running.
+#
+# Bring up together with the base compose file:
+#   docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: pocketdev-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./extensions/usage-metrics/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./.openclaw/data/prometheus-scrape-token:/etc/prometheus/openclaw-token:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - openclaw
+
+volumes:
+  prometheus-data:
