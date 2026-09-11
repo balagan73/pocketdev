@@ -225,7 +225,7 @@ English-only Piper voice just mangles non-English text into unintelligible
 audio instead of erroring. Change the `language="en"` argument there if you
 configure a non-English Piper voice.
 
-## Usage metrics (per-agent token/cost tracking)
+## Usage metrics (per-agent token tracking)
 
 Each end user gets their own OpenClaw agent bound to their own Discord bot
 (see "Per-user onboarding" below), so per-agent usage is per-user usage.
@@ -271,9 +271,7 @@ only. This can be revisited if a future plugin version adds cost export.
 `openclaw agent --agent <id> --message "..."` runs a turn through the
 Gateway for any agent, bypassing channel routing entirely — useful for
 exercising the metrics pipeline without provisioning a real bot per test
-agent (see the spec's "Interim testing note" for why this matters before
-a metered API key is wired in:
-`docs/superpowers/specs/2026-09-11-per-user-usage-tracking-design.md`).
+agent.
 
 ## Updating OpenClaw
 
