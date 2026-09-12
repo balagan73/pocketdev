@@ -38,13 +38,24 @@ var_names=$(echo "$var_names" | tr ' ' '\n' | sort -u)
 
 # If usage-metrics is selected, auto-include the metrics overlay via
 # COMPOSE_FILE (read by `docker compose` from a root .env with no -f flags
-# needed). Otherwise remove any stale .env so the overlay stays excluded.
+# needed). Only the COMPOSE_FILE line itself is added/removed/updated --
+# .env may also hold a user-set GRAFANA_ADMIN_PASSWORD (see
+# .openclaw/README.md), which must survive every rebuild untouched.
 selected_extensions=$(awk '/^extensions:/{found=1; next} found && /^[^ ]/{found=0} found && /^  - /{gsub(/^  - /, ""); print}' "$POCKETDEV_YAML")
 if echo "$selected_extensions" | grep -qx "usage-metrics"; then
-    echo "COMPOSE_FILE=docker-compose.yml:docker-compose.metrics.yml" > .env
+    touch .env
+    if grep -q '^COMPOSE_FILE=' .env; then
+        sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=docker-compose.yml:docker-compose.metrics.yml|' .env
+    else
+        echo "COMPOSE_FILE=docker-compose.yml:docker-compose.metrics.yml" >> .env
+    fi
     echo "usage-metrics selected: Prometheus/Grafana will be brought up automatically."
 else
-    rm -f .env
+    if [ -f .env ]; then
+        sed -i '/^COMPOSE_FILE=/d' .env
+        [ -s .env ] || rm -f .env
+    fi
+    echo "usage-metrics not selected: metrics overlay excluded."
 fi
 
 echo "=== pocket-dev: rebuilding container ==="
