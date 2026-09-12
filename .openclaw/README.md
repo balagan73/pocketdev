@@ -233,15 +233,19 @@ The `usage-metrics` extension enables OpenClaw's built-in
 `diagnostics-prometheus` plugin — no custom token-counting code — and an
 optional Prometheus + Grafana overlay visualizes it.
 
-The `usage-metrics` extension must be selected (via `./setup.sh`, or present
-in `pocketdev.yaml`) before bringing up this overlay — otherwise Prometheus
-gets 401s from the gateway, since no scrape token was ever written.
+Once `usage-metrics` is selected (via `./setup.sh`, or present in
+`pocketdev.yaml`) and you run `./rebuild.sh`, Prometheus and Grafana come up
+automatically alongside the gateway — no extra flags needed. `rebuild.sh`
+writes a root `.env` setting `COMPOSE_FILE` to include the metrics overlay
+whenever `usage-metrics` is selected (and removes it otherwise), so a plain
+`docker compose up -d` picks up both files on its own. Deselecting the
+extension and running `./rebuild.sh` again tears the overlay back down
+(`--remove-orphans` cleans up the now-unlisted containers).
 
-Bring up the metrics stack alongside the base container:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
-```
+If `usage-metrics` isn't selected, Prometheus never has a scrape token to
+authenticate with and would just get 401s from the gateway — which is why
+its containers only ever come up together with the extension, never on
+their own.
 
 Both services publish to loopback only (`127.0.0.1`), matching this
 deployment's trust model — the container (and now the metrics overlay) is

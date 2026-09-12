@@ -36,6 +36,17 @@ var_names=$(echo "$var_names" | tr ' ' '\n' | sort -u)
     done
 ) > "$ENV_OUT"
 
+# If usage-metrics is selected, auto-include the metrics overlay via
+# COMPOSE_FILE (read by `docker compose` from a root .env with no -f flags
+# needed). Otherwise remove any stale .env so the overlay stays excluded.
+selected_extensions=$(awk '/^extensions:/{found=1; next} found && /^[^ ]/{found=0} found && /^  - /{gsub(/^  - /, ""); print}' "$POCKETDEV_YAML")
+if echo "$selected_extensions" | grep -qx "usage-metrics"; then
+    echo "COMPOSE_FILE=docker-compose.yml:docker-compose.metrics.yml" > .env
+    echo "usage-metrics selected: Prometheus/Grafana will be brought up automatically."
+else
+    rm -f .env
+fi
+
 echo "=== pocket-dev: rebuilding container ==="
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
 echo "=== pocket-dev: rebuild complete ==="
