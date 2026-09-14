@@ -59,5 +59,8 @@ if [ $# -gt 0 ]; then
   exec "$@"
 fi
 
+# Ensure workspace plugins requiring capability consent are enabled on every start.
+node openclaw.mjs plugins enable voice-session-reset --accept-capabilities 2>/dev/null || true
+
 # --bind lan is required for Docker's bridge networking; loopback-only won't be reachable.
 exec node openclaw.mjs gateway --allow-unconfigured --bind lan
