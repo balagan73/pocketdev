@@ -2,14 +2,14 @@
 """
 Container-side trigger: sends a restart signal to the host helper via Unix socket.
 
-Run from inside the container. The socket must be mounted at /run/restart-helper.sock.
-See restart-helper.py for the host-side setup.
+Run from inside the container. The socket directory must be mounted at
+/run/restart-helper (see restart-helper.py for the host-side setup).
 """
 import os
 import socket
 import sys
 
-SOCKET_PATH = os.environ.get("RESTART_SOCKET", "/run/restart-helper.sock")
+SOCKET_PATH = os.environ.get("RESTART_SOCKET", "/run/restart-helper/helper.sock")
 
 try:
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:

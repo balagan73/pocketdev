@@ -39,3 +39,4 @@ services:
       - ./.openclaw/data:/home/node/.openclaw
       - ./.openclaw/entrypoint.sh:/oc-init/entrypoint.sh:ro
       - ${HOME}/.claude:/home/node/.claude
+      - /tmp/openclaw-restart:/run/restart-helper
