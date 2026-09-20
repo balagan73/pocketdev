@@ -29,7 +29,12 @@ if [ ! -f "$PIPER_MODEL" ]; then
 fi
 
 # Wire piper into openclaw's TTS pipeline (tts-local-cli provider).
-# messages.tts is protected; edit openclaw.json directly.
+# tts.* is protected against `config patch`; edit openclaw.json directly.
+# NOTE: tts moved from messages.tts to top-level tts (OpenClaw config schema
+# change) — writing to messages.tts here would leave a legacy key that fails
+# schema validation, breaking every extension's `config patch --stdin` call
+# that runs later in the install loop (this ran before whisper/telegram in
+# pocketdev.yaml's extension order, so it silently broke their config too).
 if [ -x "$PIPER_BIN" ] && [ -f "$PIPER_MODEL" ]; then
   python3 - << PYEOF
 import json, sys
@@ -37,8 +42,8 @@ path = "$OPENCLAW_DIR/openclaw.json"
 try:
     with open(path) as f:
         cfg = json.load(f)
-    tts = cfg.setdefault("messages", {}).setdefault("tts", {})
-    tts["enabled"] = True
+    cfg.get("messages", {}).pop("tts", None)
+    tts = cfg.setdefault("tts", {})
     tts["auto"] = "inbound"
     providers = tts.setdefault("providers", {})
     entry = providers.setdefault("tts-local-cli", {})

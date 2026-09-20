@@ -52,17 +52,16 @@ node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
 {
   tools: {
     media: {
-      audio: {
-        enabled: true,
-        models: [
-          {
-            type: "cli",
-            command: "$FW_VENV/bin/python3",
-            args: ["$OPENCLAW_DIR/whisper-transcribe.py", "{{MediaPath}}"],
-            timeoutSeconds: 120
-          }
-        ]
-      }
+      audio: { enabled: true },
+      models: [
+        {
+          type: "cli",
+          capabilities: ["audio"],
+          command: "$FW_VENV/bin/python3",
+          args: ["$OPENCLAW_DIR/whisper-transcribe.py", "{{MediaPath}}"],
+          timeoutSeconds: 120
+        }
+      ]
     }
   }
 }
