@@ -292,6 +292,49 @@ Gateway for any agent, bypassing channel routing entirely — useful for
 exercising the metrics pipeline without provisioning a real bot per test
 agent.
 
+## Remote restart & rebuild (from inside the container)
+
+The container has no `docker.sock` and can't restart or rebuild itself.
+`scripts/restart-helper.py` (host-side) and `scripts/restart-trigger.py`
+(container-side) let the agent ask the host to do either over a Unix socket
+— useful when the agent needs to recover from a stuck gateway process, or
+wants to pick up a change it just made to its own extensions.
+
+Start the listener on the **host** (not inside the container) and leave it
+running — it isn't supervised, so it won't survive a host reboot on its own
+unless you wrap it in `tmux`, `screen`, or a systemd user service:
+
+```bash
+nohup python3 scripts/restart-helper.py > /tmp/restart-helper.log 2>&1 &
+disown
+```
+
+It listens on `/tmp/openclaw-restart/helper.sock`, which `docker-compose.yml`
+mounts into the container at `/run/restart-helper` (the socket's *parent
+directory* is mounted, not the file itself, since the helper recreates the
+socket file every time it restarts).
+
+From inside the container:
+
+```bash
+python3 /workspace/scripts/restart-trigger.py           # restart
+python3 /workspace/scripts/restart-trigger.py rebuild   # rebuild
+```
+
+- **`restart`** (`docker compose restart openclaw`) — seconds, reuses the
+  existing image. Good for a hung/stuck process or state that's only read at
+  startup (e.g. plugin enablement); useless for anything baked into the
+  image at build time.
+- **`rebuild`** (`bash rebuild.sh`) — minutes, rebuilds the image first.
+  Needed whenever `extensions/`, `stacks/`, or `pocketdev.yaml` changed —
+  see the top-level `README.md`'s note on extensions needing a rebuild when
+  their own code (not just their config) changes.
+
+Either command kills the very container the trigger script is running in
+partway through, so it may report a broken connection instead of a clean
+"ok" — that's expected, not a failure. Check the host-side listener's log or
+`docker compose logs openclaw` to confirm it actually worked.
+
 ## Updating OpenClaw
 
 `.openclaw/Dockerfile` pins `FROM ghcr.io/openclaw/openclaw:<version>` to an
