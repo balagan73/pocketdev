@@ -26,6 +26,8 @@ For operator-level details (health check, Telegram pairing, voice transcription,
 
 **Extensions** (runtime) only modify the running container: Telegram channel tuning, text-to-speech configuration, voice transcription setup, custom tooling. Selecting an extension requires only a container restart (`docker compose restart`)—no rebuild.
 
+> **This is about *selecting/configuring* an extension, not editing one.** `extensions/` is copied into the image at build time (`COPY extensions/` in `.openclaw/Dockerfile`), same as `stacks/`. Changing an extension's own `install.sh`, or adding a new file under its directory, always needs `./rebuild.sh` — regardless of that extension's `requires_rebuild` manifest flag, which describes whether *selecting* the extension needs new build-time dependencies (SDKs, apt packages), not whether its own code has changed since the image was last built. A plain restart just reruns whatever `install.sh` is already baked into the current image.
+
 ### Single Source of Truth: `pocketdev.yaml`
 
 This file holds your selections:
