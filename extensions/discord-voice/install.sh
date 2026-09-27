@@ -16,6 +16,9 @@ read_field() {
 
 VOICE_MODE=$(read_field "voice_mode" "stt-tts")
 TTS_PROVIDER=$(read_field "tts_provider" "tts-local-cli")
+REALTIME_PROVIDER=$(read_field "realtime_provider" "")
+REALTIME_MODEL=$(read_field "realtime_model" "")
+REALTIME_VOICE=$(read_field "realtime_voice" "")
 
 # The Discord channel ships as a separate plugin, not bundled with OpenClaw
 # core (unlike Telegram) — install it if it isn't already present.
@@ -31,10 +34,20 @@ fi
 # section for the one-time manual setup (same pattern as the Telegram
 # botToken, which also lives only in .openclaw/data/openclaw.json, never
 # in a committed file).
+#
+# realtime_provider/model/voice (agent-proxy/bidi only) are plain product
+# choices, not secrets, so they're templated here same as mode/tts_provider
+# — the API key itself is never in this script or config.yaml; it's read
+# from OPENAI_API_KEY (see config.yaml's comment) at request time.
+REALTIME_JSON=""
+if [ -n "$REALTIME_PROVIDER" ]; then
+  REALTIME_JSON=", realtime: { provider: \"$REALTIME_PROVIDER\", model: \"$REALTIME_MODEL\", speakerVoice: \"$REALTIME_VOICE\" }"
+fi
+
 node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
   && echo "Configured Discord voice mode ($VOICE_MODE, tts: $TTS_PROVIDER)." \
   || echo "Warning: failed to configure Discord voice mode"
-{ channels: { discord: { voice: { enabled: true, mode: "$VOICE_MODE", tts: { provider: "$TTS_PROVIDER" } } } } }
+{ channels: { discord: { voice: { enabled: true, mode: "$VOICE_MODE", tts: { provider: "$TTS_PROVIDER" }$REALTIME_JSON } } } }
 JSONEOF
 
 # --- Voice session reset (bundled with discord-voice — meaningless on its

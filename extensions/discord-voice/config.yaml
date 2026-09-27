@@ -1,15 +1,33 @@
 # Discord voice extension configuration
-# voice_mode: stt-tts | agent-proxy
+# voice_mode: stt-tts | agent-proxy | bidi
 #   stt-tts     — traditional pipeline: reuses the container's existing
 #                 whisper transcription (tools.media.audio) and TTS
 #                 (tts_provider below) — free, no external API keys.
-#   agent-proxy — lower-latency realtime voice via a hosted realtime
-#                 provider (e.g. OpenAI Realtime) — requires a paid API key;
-#                 do not switch to this without explicit spend approval
-#                 (see AGENTS.md "Existing Solutions Preflight").
-voice_mode: stt-tts
+#   agent-proxy — realtime provider (see realtime_* below) is only a fast
+#                 audio front-end (turn-taking, interruption, playback);
+#                 every reply still round-trips to the OpenClaw agent via
+#                 consult, so the agent's personality/tools are unchanged —
+#                 requires a paid API key.
+#   bidi        — realtime provider carries the conversation directly
+#                 (lowest latency), only consulting the OpenClaw agent for
+#                 tool-worthy actions — requires a paid API key.
+#   Switched to bidi 2026-09-27 with explicit owner approval (OpenAI key
+#   provided directly) — do not switch away from stt-tts to agent-proxy or
+#   bidi without the same explicit spend approval next time (see AGENTS.md
+#   "Existing Solutions Preflight").
+voice_mode: bidi
 
 # tts_provider: which entry under messages.tts.providers to use for voice
-# playback. Defaults to tts-local-cli (piper), already configured by the
-# piper extension — keeps voice replies fully local and free.
+# playback in stt-tts mode. Ignored in agent-proxy/bidi mode, where the
+# realtime provider handles audio directly. Defaults to tts-local-cli
+# (piper), already configured by the piper extension.
 tts_provider: tts-local-cli
+
+# realtime_provider / realtime_model / realtime_voice: only used when
+# voice_mode is agent-proxy or bidi. The API key is NEVER set here — it's
+# read from the OPENAI_API_KEY environment variable (see .openclaw/data/.env,
+# gitignored, never committed) or a saved `openclaw models auth login
+# --provider openai` profile.
+realtime_provider: openai
+realtime_model: gpt-realtime-2.1
+realtime_voice: cedar
