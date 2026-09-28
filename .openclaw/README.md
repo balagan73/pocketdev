@@ -165,6 +165,12 @@ leave` ends the session. If it doesn't respond, check
 
 ## Switching voice mode
 
+By default the bot joins voice in `stt-tts` mode: the container's own
+OpenClaw agent answers, with no realtime provider or paid API in the loop.
+A realtime provider (e.g. OpenAI GPT-Realtime, `bidi` mode) is opt-in,
+either live with the switch script below or at container start with an env
+var (see the end of this section).
+
 `scripts/discord-voice-mode.sh` switches the Discord voice channel live
 between a realtime provider and the container's own OpenClaw agent. It is a
 `config patch` against the running Gateway, so there's no rebuild and no
@@ -198,10 +204,21 @@ When you switch, the Gateway hot-reloads the Discord channel: the bot drops
 out of voice for about 2 seconds and rejoins in the new mode. If a
 conversation is in progress, it's cut off.
 
-The switch lasts only until the next container start. At startup,
-`install.sh` re-applies `voice_mode` from the image's baked
-`extensions/discord-voice/config.yaml`. To change the default permanently,
-edit `voice_mode` there and rebuild.
+The switch lasts only until the next container start. At startup, the
+extension's `install.sh` re-applies the default mode, which is `stt-tts`
+(and removes any `realtime` block left by an earlier switch). To start in a
+realtime mode instead, override the default in one of two ways:
+
+- **Env var, no config edit.** Set `DISCORD_VOICE_MODE=bidi` (or
+  `agent-proxy`; `realtime` and `claude` are accepted as aliases) in the
+  container's environment. `docker-compose.yml` passes it through from the
+  host shell or the repo-root `.env`, so `DISCORD_VOICE_MODE=bidi
+  ./rebuild.sh` works. `REALTIME_PROVIDER`, `REALTIME_MODEL`, and
+  `REALTIME_VOICE` likewise override the `realtime_*` keys. The value is
+  read on every container start, so it has to stay set for later restarts too.
+- **Config default.** Edit `voice_mode` in
+  `extensions/discord-voice/config.yaml` and rebuild. The file is baked into
+  the image, so a plain restart doesn't pick up the change.
 
 ## Voice session reset
 

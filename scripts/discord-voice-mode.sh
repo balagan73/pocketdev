@@ -17,9 +17,9 @@
 # extensions/discord-voice/realtime-instructions.txt exists, its contents are
 # set as realtime.instructions.
 #
-# Note: install.sh re-applies config.yaml's voice_mode on every container
-# start, so a switch made here lasts until the next container restart unless
-# config.yaml's voice_mode matches it.
+# Note: install.sh re-applies the default voice mode on every container start
+# (stt-tts, unless DISCORD_VOICE_MODE or config.yaml's voice_mode says
+# otherwise), so a switch made here lasts until the next container restart.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -14,11 +14,18 @@ read_field() {
     echo "${value:-$default}"
 }
 
-VOICE_MODE=$(read_field "voice_mode" "stt-tts")
+# Container env vars override config.yaml, so realtime can be opted into at
+# container start without editing the baked-in config (e.g. add
+# DISCORD_VOICE_MODE=bidi to the compose environment). Default: stt-tts.
+VOICE_MODE="${DISCORD_VOICE_MODE:-$(read_field "voice_mode" "stt-tts")}"
+case "$VOICE_MODE" in
+    claude) VOICE_MODE="stt-tts" ;;   # same names scripts/discord-voice-mode.sh uses
+    realtime) VOICE_MODE="bidi" ;;
+esac
 TTS_PROVIDER=$(read_field "tts_provider" "tts-local-cli")
-REALTIME_PROVIDER=$(read_field "realtime_provider" "")
-REALTIME_MODEL=$(read_field "realtime_model" "")
-REALTIME_VOICE=$(read_field "realtime_voice" "")
+REALTIME_PROVIDER="${REALTIME_PROVIDER:-$(read_field "realtime_provider" "openai")}"
+REALTIME_MODEL="${REALTIME_MODEL:-$(read_field "realtime_model" "gpt-realtime-2.1")}"
+REALTIME_VOICE="${REALTIME_VOICE:-$(read_field "realtime_voice" "cedar")}"
 
 # The Discord channel ships as a separate plugin, not bundled with OpenClaw
 # core (unlike Telegram) — install it if it isn't already present.
@@ -39,8 +46,13 @@ fi
 # choices, not secrets, so they're templated here same as mode/tts_provider
 # — the API key itself is never in this script or config.yaml; it's read
 # from OPENAI_API_KEY (see config.yaml's comment) at request time.
-REALTIME_JSON=""
-if [ -n "$REALTIME_PROVIDER" ]; then
+#
+# In stt-tts the realtime block is deleted (realtime: null), matching
+# `scripts/discord-voice-mode.sh claude`, so a realtime block left in the
+# persisted openclaw.json by an earlier live switch doesn't linger.
+if [ "$VOICE_MODE" = "stt-tts" ]; then
+  REALTIME_JSON=", realtime: null"
+else
   REALTIME_JSON=", realtime: { provider: \"$REALTIME_PROVIDER\", model: \"$REALTIME_MODEL\", speakerVoice: \"$REALTIME_VOICE\" }"
 fi
 
