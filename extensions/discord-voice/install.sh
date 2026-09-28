@@ -55,10 +55,21 @@ fi
 # In stt-tts the realtime block is deleted (realtime: null), matching
 # `scripts/discord-voice-mode.sh default`, so a realtime block left in the
 # persisted openclaw.json by an earlier live switch doesn't linger.
+#
+# realtime-instructions.txt (if present) becomes realtime.instructions, same
+# as `scripts/discord-voice-mode.sh realtime` does for a live switch.
+INSTRUCTIONS_FILE="$(dirname "$0")/realtime-instructions.txt"
 if [ "$VOICE_MODE" = "stt-tts" ]; then
   REALTIME_JSON=", realtime: null"
 else
-  REALTIME_JSON=", realtime: { provider: \"$REALTIME_PROVIDER\", model: \"$REALTIME_MODEL\", speakerVoice: \"$REALTIME_VOICE\" }"
+  INSTRUCTIONS_JSON=""
+  if [ -f "$INSTRUCTIONS_FILE" ]; then
+    # node for JSON string-escaping (quotes, newlines); jq isn't in the image.
+    INSTRUCTIONS_JSON=$(node -e 'console.log(JSON.stringify(require("fs").readFileSync(process.argv[1], "utf8").trim()))' "$INSTRUCTIONS_FILE" 2>/dev/null) \
+      && INSTRUCTIONS_JSON=", instructions: $INSTRUCTIONS_JSON" \
+      || { echo "Warning: could not read $INSTRUCTIONS_FILE; realtime instructions left unset"; INSTRUCTIONS_JSON=""; }
+  fi
+  REALTIME_JSON=", realtime: { provider: \"$REALTIME_PROVIDER\", model: \"$REALTIME_MODEL\", speakerVoice: \"$REALTIME_VOICE\"$INSTRUCTIONS_JSON }"
 fi
 
 node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \

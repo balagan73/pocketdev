@@ -186,7 +186,8 @@ scripts/discord-voice-mode.sh status                             # show what's a
 ```
 
 Add `--dry-run` after `model <key>`, `default`, or `realtime` to validate the
-patch without applying it. Run the script from the host, where it uses
+patch without applying it. Add `--after N` to apply it N seconds later instead
+(see [Switching from Discord](#switching-from-discord)). Run the script from the host, where it uses
 `docker exec` against the container named in `$POCKETDEV_CONTAINER` (default
 `pocketdev`), or from inside the container, where it calls `openclaw`
 directly. It's safe to re-run: if the patch doesn't change anything, the
@@ -237,6 +238,28 @@ override the defaults in one of two ways:
 - **Config default.** Edit `voice_mode` or `voice_model` in
   `extensions/discord-voice/config.yaml` and rebuild. The file is baked into
   the image, so a plain restart doesn't pick up the change.
+
+### Switching from Discord
+
+Users can also switch the model from inside Discord, with no shell needed:
+"switch to sonnet", "go back to the default", "use the realtime model", or
+"what model are you using?". The
+`.agents/skills/discord-voice-model-switch` skill, which OpenClaw loads for the
+agent whose workspace is this repo, maps the request to a key from `list`. It
+then runs the script with `--after 10`. `--after N` validates the target
+straight away and applies it N seconds later in a detached process, so the
+spoken confirmation finishes before the channel reloads. The delayed run logs
+to `/tmp/discord-voice-mode.log`.
+
+- **`stt-tts` mode (voice or typed):** works as is. Voice and typed turns run
+  as ordinary agent turns with the agent's normal tool access.
+- **`bidi` mode (voice):** `realtime-instructions.txt` tells the realtime model
+  to route these requests to `openclaw_agent_consult`. Consults run under
+  `voice.realtime.toolPolicy`. OpenClaw defaults this to `safe-read-only` in
+  `bidi`, which can't run scripts, so the agent asks the user to type the
+  request in the channel's text chat instead. Typed messages work in any mode.
+  `install.sh` also applies `realtime-instructions.txt` when the container
+  starts in a realtime mode.
 
 ## Voice session reset
 

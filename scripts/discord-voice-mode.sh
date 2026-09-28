@@ -6,14 +6,21 @@
 #
 # Usage:
 #   scripts/discord-voice-mode.sh list                          # models in OpenClaw's catalog (* = active)
-#   scripts/discord-voice-mode.sh model <provider/model> [--dry-run]  # stt-tts, answered by that model
-#   scripts/discord-voice-mode.sh default  [--dry-run]          # stt-tts with config.yaml's voice_model
-#   scripts/discord-voice-mode.sh realtime [--dry-run]          # bidi: realtime provider converses, consults the agent
+#   scripts/discord-voice-mode.sh model <provider/model> [--dry-run] [--after N]  # stt-tts, answered by that model
+#   scripts/discord-voice-mode.sh default  [--dry-run] [--after N]  # stt-tts with config.yaml's voice_model
+#   scripts/discord-voice-mode.sh realtime [--dry-run] [--after N]  # bidi: realtime provider converses, consults the agent
 #   scripts/discord-voice-mode.sh status                        # print the active voice config
 #
 # `model` accepts only a key printed by `list` (the output of
 # `openclaw models list --all --plain`); anything else is rejected. `claude`
 # is accepted as an alias for `default`.
+#
+# --after N validates the switch now (errors are reported immediately), then
+# applies it N seconds later in a detached process and returns at once. The
+# voice agent uses this (see .agents/skills/discord-voice-model-switch/) so
+# its spoken confirmation plays before the Discord channel hot-reloads, which
+# would otherwise drop the in-flight reply. Output of the delayed run goes to
+# $DISCORD_VOICE_MODE_LOG (default /tmp/discord-voice-mode.log).
 #
 # Runs from the host (via `docker exec`, container name from $POCKETDEV_CONTAINER,
 # default "pocketdev") or from inside the container (calls `openclaw` directly).
@@ -50,11 +57,20 @@ if [ "$TARGET" = "model" ]; then
     shift
 fi
 DRY_RUN=""
-case "${1:-}" in
-    "") ;;
-    --dry-run) DRY_RUN="--dry-run" ;;
-    *) usage ;;
-esac
+AFTER=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN="--dry-run" ;;
+        --after)
+            AFTER="${2:-}"
+            [[ "$AFTER" =~ ^[0-9]+$ ]] || usage
+            shift
+            ;;
+        *) usage ;;
+    esac
+    shift
+done
+LOG_FILE="${DISCORD_VOICE_MODE_LOG:-/tmp/discord-voice-mode.log}"
 
 # Run a command in the OpenClaw container, stdin passed through.
 oc() {
@@ -151,6 +167,18 @@ case "$TARGET" in
         usage
         ;;
 esac
+
+if [ -n "$AFTER" ]; then
+    # Validate now so a bad target is reported to the caller, not just logged.
+    echo "$PATCH" | oc openclaw config patch --stdin --dry-run >/dev/null
+    # setsid + full redirection: the delayed run must outlive the caller
+    # (a docker exec, or the agent's Bash tool call) and hold none of its fds.
+    setsid nohup bash -c 'sleep "$1"; shift; echo "--- $(date -u +%FT%TZ) $*"; exec "$@"' _ \
+        "$AFTER" "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" "$TARGET" ${MODEL_ARG:+"$MODEL_ARG"} $DRY_RUN \
+        >>"$LOG_FILE" 2>&1 </dev/null &
+    echo "Validated. Switching to '${MODEL_ARG:-$TARGET}' in ${AFTER}s (log: $LOG_FILE)."
+    exit 0
+fi
 
 echo "$PATCH" | oc openclaw config patch --stdin $DRY_RUN
 if [ -n "$DRY_RUN" ]; then
