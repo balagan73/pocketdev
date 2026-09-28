@@ -163,6 +163,104 @@ piper-synthesized reply after whisper transcribes what you said. `/vc
 leave` ends the session. If it doesn't respond, check
 `docker compose logs openclaw` for errors.
 
+## Switching voice mode
+
+By default the bot joins voice in `stt-tts` mode with the model set by
+`voice_model` in `extensions/discord-voice/config.yaml`
+(`anthropic/claude-haiku-4-5` as shipped). The container's own OpenClaw agent
+answers, with no realtime provider in the loop. You can switch to any other
+model in OpenClaw's model catalog, or to a realtime provider (e.g. OpenAI
+GPT-Realtime, `bidi` mode). Do this live with the switch script below, or at
+container start with an env var (see the end of this section).
+
+`scripts/discord-voice-mode.sh` switches the Discord voice channel live. It is
+a `config patch` against the running Gateway, so there's no rebuild and no
+container restart:
+
+```bash
+scripts/discord-voice-mode.sh list                               # models in OpenClaw's catalog, * marks the active one
+scripts/discord-voice-mode.sh model anthropic/claude-sonnet-4-6  # stt-tts, answered by that model
+scripts/discord-voice-mode.sh default                            # stt-tts with config.yaml's voice_model
+scripts/discord-voice-mode.sh realtime                           # bidi: realtime model talks, consults the agent when needed
+scripts/discord-voice-mode.sh status                             # show what's active
+```
+
+Add `--dry-run` after `model <key>`, `default`, or `realtime` to validate the
+patch without applying it. Add `--after N` to apply it N seconds later instead
+(see [Switching from Discord](#switching-from-discord)). Run the script from the host, where it uses
+`docker exec` against the container named in `$POCKETDEV_CONTAINER` (default
+`pocketdev`), or from inside the container, where it calls `openclaw`
+directly. It's safe to re-run: if the patch doesn't change anything, the
+Gateway doesn't reload.
+
+- **`list`** prints `openclaw models list --all --plain`, the models this
+  OpenClaw install knows about. The list comes from the container, so it
+  always reflects the installed OpenClaw version, not a copy in this repo.
+- **`model <provider/model>`** sets `mode: "stt-tts"`, sets
+  `channels.discord.voice.model` to the given key, and deletes the `realtime`
+  block. The key must appear exactly as printed by `list`; anything else is
+  rejected with the list of valid keys. This check is needed because
+  `config patch` accepts any string as a model. The model's provider needs to
+  be authenticated in the container. Speech is transcribed with
+  `tools.media.audio` (whisper), answered by the OpenClaw agent on that model,
+  and spoken with `voice.tts` (piper). No external realtime API is involved.
+  Note that `agent-proxy` is *not* this mode, because it still uses a realtime
+  provider as its audio front end.
+- **`default`** (alias `claude`) is `model` with `voice_model` from
+  `config.yaml`.
+- **`realtime`** sets `mode: "bidi"` and a `realtime` block with provider,
+  model, and voice taken from `extensions/discord-voice/config.yaml`
+  (`realtime_*` keys). If `extensions/discord-voice/realtime-instructions.txt`
+  exists, its contents are also set as `realtime.instructions`. It leaves
+  `voice.model` alone; that agent model handles consults. The provider needs
+  its paid API key, e.g. `OPENAI_API_KEY`.
+
+When you switch, the Gateway hot-reloads the Discord channel: the bot drops
+out of voice for about 2 seconds and rejoins in the new mode. If a
+conversation is in progress, it's cut off.
+
+The switch lasts only until the next container start. At startup, the
+extension's `install.sh` re-applies the default mode and model, which are
+`stt-tts` and `voice_model`. It also removes any `realtime` block left by an
+earlier switch. To start with a different model or in a realtime mode instead,
+override the defaults in one of two ways:
+
+- **Env var, no config edit.** Set `DISCORD_VOICE_MODEL` to a catalog key to
+  change the model, or `DISCORD_VOICE_MODE=bidi` (or `agent-proxy`;
+  `realtime`, `claude`, and `default` are accepted as aliases) to change the
+  mode, in the container's environment. `docker-compose.yml` passes both
+  through from the host shell or the repo-root `.env`, so
+  `DISCORD_VOICE_MODE=bidi ./rebuild.sh` works. `REALTIME_PROVIDER`,
+  `REALTIME_MODEL`, and `REALTIME_VOICE` likewise override the `realtime_*`
+  keys. `install.sh` does not check `DISCORD_VOICE_MODEL` against the catalog,
+  so run `list` first. These values are read on every container start, so they
+  have to stay set for later restarts too.
+- **Config default.** Edit `voice_mode` or `voice_model` in
+  `extensions/discord-voice/config.yaml` and rebuild. The file is baked into
+  the image, so a plain restart doesn't pick up the change.
+
+### Switching from Discord
+
+Users can also switch the model from inside Discord, with no shell needed:
+"switch to sonnet", "go back to the default", "use the realtime model", or
+"what model are you using?". The
+`.agents/skills/discord-voice-model-switch` skill, which OpenClaw loads for the
+agent whose workspace is this repo, maps the request to a key from `list`. It
+then runs the script with `--after 10`. `--after N` validates the target
+straight away and applies it N seconds later in a detached process, so the
+spoken confirmation finishes before the channel reloads. The delayed run logs
+to `/tmp/discord-voice-mode.log`.
+
+- **`stt-tts` mode (voice or typed):** works as is. Voice and typed turns run
+  as ordinary agent turns with the agent's normal tool access.
+- **`bidi` mode (voice):** `realtime-instructions.txt` tells the realtime model
+  to route these requests to `openclaw_agent_consult`. Consults run under
+  `voice.realtime.toolPolicy`. OpenClaw defaults this to `safe-read-only` in
+  `bidi`, which can't run scripts, so the agent asks the user to type the
+  request in the channel's text chat instead. Typed messages work in any mode.
+  `install.sh` also applies `realtime-instructions.txt` when the container
+  starts in a realtime mode.
+
 ## Voice session reset
 
 Say a trigger phrase in the Discord voice channel (e.g. "start new session",

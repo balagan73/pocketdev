@@ -14,8 +14,19 @@ read_field() {
     echo "${value:-$default}"
 }
 
-VOICE_MODE=$(read_field "voice_mode" "stt-tts")
+# Container env vars override config.yaml, so realtime can be opted into at
+# container start without editing the baked-in config (e.g. add
+# DISCORD_VOICE_MODE=bidi to the compose environment). Default: stt-tts.
+VOICE_MODE="${DISCORD_VOICE_MODE:-$(read_field "voice_mode" "stt-tts")}"
+case "$VOICE_MODE" in
+    claude|default) VOICE_MODE="stt-tts" ;;   # same names scripts/discord-voice-mode.sh uses
+    realtime) VOICE_MODE="bidi" ;;
+esac
+VOICE_MODEL="${DISCORD_VOICE_MODEL:-$(read_field "voice_model" "anthropic/claude-haiku-4-5")}"
 TTS_PROVIDER=$(read_field "tts_provider" "tts-local-cli")
+REALTIME_PROVIDER="${REALTIME_PROVIDER:-$(read_field "realtime_provider" "openai")}"
+REALTIME_MODEL="${REALTIME_MODEL:-$(read_field "realtime_model" "gpt-realtime-2.1")}"
+REALTIME_VOICE="${REALTIME_VOICE:-$(read_field "realtime_voice" "cedar")}"
 
 # The Discord channel ships as a separate plugin, not bundled with OpenClaw
 # core (unlike Telegram) — install it if it isn't already present.
@@ -31,10 +42,40 @@ fi
 # section for the one-time manual setup (same pattern as the Telegram
 # botToken, which also lives only in .openclaw/data/openclaw.json, never
 # in a committed file).
+#
+# realtime_provider/model/voice (agent-proxy/bidi only) are plain product
+# choices, not secrets, so they're templated here same as mode/tts_provider
+# — the API key itself is never in this script or config.yaml; it's read
+# from OPENAI_API_KEY (see config.yaml's comment) at request time.
+#
+# voice.model is the OpenClaw agent model that answers voice (stt-tts) or
+# handles consults (agent-proxy/bidi). It isn't validated here — the Gateway
+# isn't up yet; `scripts/discord-voice-mode.sh list` shows valid keys.
+#
+# In stt-tts the realtime block is deleted (realtime: null), matching
+# `scripts/discord-voice-mode.sh default`, so a realtime block left in the
+# persisted openclaw.json by an earlier live switch doesn't linger.
+#
+# realtime-instructions.txt (if present) becomes realtime.instructions, same
+# as `scripts/discord-voice-mode.sh realtime` does for a live switch.
+INSTRUCTIONS_FILE="$(dirname "$0")/realtime-instructions.txt"
+if [ "$VOICE_MODE" = "stt-tts" ]; then
+  REALTIME_JSON=", realtime: null"
+else
+  INSTRUCTIONS_JSON=""
+  if [ -f "$INSTRUCTIONS_FILE" ]; then
+    # node for JSON string-escaping (quotes, newlines); jq isn't in the image.
+    INSTRUCTIONS_JSON=$(node -e 'console.log(JSON.stringify(require("fs").readFileSync(process.argv[1], "utf8").trim()))' "$INSTRUCTIONS_FILE" 2>/dev/null) \
+      && INSTRUCTIONS_JSON=", instructions: $INSTRUCTIONS_JSON" \
+      || { echo "Warning: could not read $INSTRUCTIONS_FILE; realtime instructions left unset"; INSTRUCTIONS_JSON=""; }
+  fi
+  REALTIME_JSON=", realtime: { provider: \"$REALTIME_PROVIDER\", model: \"$REALTIME_MODEL\", speakerVoice: \"$REALTIME_VOICE\"$INSTRUCTIONS_JSON }"
+fi
+
 node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
-  && echo "Configured Discord voice mode ($VOICE_MODE, tts: $TTS_PROVIDER)." \
+  && echo "Configured Discord voice mode ($VOICE_MODE, model: $VOICE_MODEL, tts: $TTS_PROVIDER)." \
   || echo "Warning: failed to configure Discord voice mode"
-{ channels: { discord: { voice: { enabled: true, mode: "$VOICE_MODE", tts: { provider: "$TTS_PROVIDER" } } } } }
+{ channels: { discord: { voice: { enabled: true, mode: "$VOICE_MODE", model: "$VOICE_MODEL", tts: { provider: "$TTS_PROVIDER" }$REALTIME_JSON } } } }
 JSONEOF
 
 # --- Voice session reset (bundled with discord-voice — meaningless on its

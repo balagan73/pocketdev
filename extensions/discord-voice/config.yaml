@@ -1,15 +1,43 @@
 # Discord voice extension configuration
-# voice_mode: stt-tts | agent-proxy
+# voice_mode: stt-tts | agent-proxy | bidi
 #   stt-tts     — traditional pipeline: reuses the container's existing
 #                 whisper transcription (tools.media.audio) and TTS
 #                 (tts_provider below) — free, no external API keys.
-#   agent-proxy — lower-latency realtime voice via a hosted realtime
-#                 provider (e.g. OpenAI Realtime) — requires a paid API key;
-#                 do not switch to this without explicit spend approval
-#                 (see AGENTS.md "Existing Solutions Preflight").
+#   agent-proxy — realtime provider (see realtime_* below) is only a fast
+#                 audio front-end (turn-taking, interruption, playback);
+#                 every reply still round-trips to the OpenClaw agent via
+#                 consult, so the agent's personality/tools are unchanged —
+#                 requires a paid API key.
+#   bidi        — realtime provider carries the conversation directly
+#                 (lowest latency), only consulting the OpenClaw agent for
+#                 tool-worthy actions — requires a paid API key.
+#   Default is stt-tts (the OpenClaw agent answers). Realtime is opt-in:
+#   live via `scripts/discord-voice-mode.sh realtime`, or at container start
+#   by setting DISCORD_VOICE_MODE=bidi (or agent-proxy) in the container's
+#   environment, which overrides this value. Only opt into a paid mode with
+#   explicit spend approval (see AGENTS.md "Existing Solutions Preflight").
 voice_mode: stt-tts
 
+# voice_model: the OpenClaw agent model (provider/model key) that answers in
+# stt-tts mode and handles consults in agent-proxy/bidi. Must be a key from
+# OpenClaw's model catalog — `scripts/discord-voice-mode.sh list` prints
+# them, and `scripts/discord-voice-mode.sh model <key>` switches live. Can be
+# overridden at container start by the DISCORD_VOICE_MODEL env var.
+voice_model: anthropic/claude-haiku-4-5
+
 # tts_provider: which entry under messages.tts.providers to use for voice
-# playback. Defaults to tts-local-cli (piper), already configured by the
-# piper extension — keeps voice replies fully local and free.
+# playback in stt-tts mode. Ignored in agent-proxy/bidi mode, where the
+# realtime provider handles audio directly. Defaults to tts-local-cli
+# (piper), already configured by the piper extension.
 tts_provider: tts-local-cli
+
+# realtime_provider / realtime_model / realtime_voice: only used when
+# voice_mode is agent-proxy or bidi (ignored in stt-tts, where install.sh
+# removes the realtime block). Each can be overridden at container start by
+# the REALTIME_PROVIDER / REALTIME_MODEL / REALTIME_VOICE env vars. The API
+# key is NEVER set here — it's read from the OPENAI_API_KEY environment
+# variable (see .openclaw/data/.env, gitignored, never committed) or a saved
+# `openclaw models auth login --provider openai` profile.
+realtime_provider: openai
+realtime_model: gpt-realtime-2.1
+realtime_voice: cedar
