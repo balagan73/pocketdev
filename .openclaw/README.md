@@ -163,6 +163,46 @@ piper-synthesized reply after whisper transcribes what you said. `/vc
 leave` ends the session. If it doesn't respond, check
 `docker compose logs openclaw` for errors.
 
+## Switching voice mode
+
+`scripts/discord-voice-mode.sh` switches the Discord voice channel live
+between a realtime provider and the container's own OpenClaw agent. It is a
+`config patch` against the running Gateway, so there's no rebuild and no
+container restart:
+
+```bash
+scripts/discord-voice-mode.sh realtime   # bidi: realtime model talks, consults the agent when needed
+scripts/discord-voice-mode.sh claude     # stt-tts: whisper -> OpenClaw agent -> local TTS, no realtime provider
+scripts/discord-voice-mode.sh status     # show what's active
+```
+
+Add `--dry-run` after `claude` or `realtime` to validate the patch without
+applying it. Run the script from the host, where it uses `docker exec` against
+the container named in `$POCKETDEV_CONTAINER` (default `pocketdev`), or from
+inside the container, where it calls `openclaw` directly. It's safe to re-run:
+if the patch doesn't change anything, the Gateway doesn't reload.
+
+- **`realtime`** sets `mode: "bidi"` and a `realtime` block with provider,
+  model, and voice taken from `extensions/discord-voice/config.yaml`
+  (`realtime_*` keys). If `extensions/discord-voice/realtime-instructions.txt`
+  exists, its contents are also set as `realtime.instructions`. The provider
+  needs its paid API key, e.g. `OPENAI_API_KEY`.
+- **`claude`** sets `mode: "stt-tts"` and deletes the `realtime` block. Speech
+  is transcribed with `tools.media.audio` (whisper), answered by the OpenClaw
+  agent (`channels.discord.voice.model` if set, otherwise the routed agent's
+  model), and spoken with `voice.tts` (piper). No external realtime API is
+  involved. Note that `agent-proxy` is *not* this mode, because it still uses
+  a realtime provider as its audio front end.
+
+When you switch, the Gateway hot-reloads the Discord channel: the bot drops
+out of voice for about 2 seconds and rejoins in the new mode. If a
+conversation is in progress, it's cut off.
+
+The switch lasts only until the next container start. At startup,
+`install.sh` re-applies `voice_mode` from the image's baked
+`extensions/discord-voice/config.yaml`. To change the default permanently,
+edit `voice_mode` there and rebuild.
+
 ## Voice session reset
 
 Say a trigger phrase in the Discord voice channel (e.g. "start new session",
