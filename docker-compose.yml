@@ -36,9 +36,11 @@ services:
       - GIT_CONFIG_VALUE_0=.githooks
       # Optional discord-voice overrides, read by its install.sh at container
       # start (empty = use extensions/discord-voice/config.yaml, whose default
-      # is stt-tts). E.g. `DISCORD_VOICE_MODE=bidi ./rebuild.sh` opts into
-      # realtime voice.
+      # is stt-tts with anthropic/claude-haiku-4-5). E.g.
+      # `DISCORD_VOICE_MODE=bidi ./rebuild.sh` opts into realtime voice;
+      # DISCORD_VOICE_MODEL picks another model from OpenClaw's catalog.
       - DISCORD_VOICE_MODE=${DISCORD_VOICE_MODE:-}
+      - DISCORD_VOICE_MODEL=${DISCORD_VOICE_MODEL:-}
       - REALTIME_PROVIDER=${REALTIME_PROVIDER:-}
       - REALTIME_MODEL=${REALTIME_MODEL:-}
       - REALTIME_VOICE=${REALTIME_VOICE:-}

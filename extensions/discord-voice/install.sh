@@ -19,9 +19,10 @@ read_field() {
 # DISCORD_VOICE_MODE=bidi to the compose environment). Default: stt-tts.
 VOICE_MODE="${DISCORD_VOICE_MODE:-$(read_field "voice_mode" "stt-tts")}"
 case "$VOICE_MODE" in
-    claude) VOICE_MODE="stt-tts" ;;   # same names scripts/discord-voice-mode.sh uses
+    claude|default) VOICE_MODE="stt-tts" ;;   # same names scripts/discord-voice-mode.sh uses
     realtime) VOICE_MODE="bidi" ;;
 esac
+VOICE_MODEL="${DISCORD_VOICE_MODEL:-$(read_field "voice_model" "anthropic/claude-haiku-4-5")}"
 TTS_PROVIDER=$(read_field "tts_provider" "tts-local-cli")
 REALTIME_PROVIDER="${REALTIME_PROVIDER:-$(read_field "realtime_provider" "openai")}"
 REALTIME_MODEL="${REALTIME_MODEL:-$(read_field "realtime_model" "gpt-realtime-2.1")}"
@@ -47,8 +48,12 @@ fi
 # — the API key itself is never in this script or config.yaml; it's read
 # from OPENAI_API_KEY (see config.yaml's comment) at request time.
 #
+# voice.model is the OpenClaw agent model that answers voice (stt-tts) or
+# handles consults (agent-proxy/bidi). It isn't validated here — the Gateway
+# isn't up yet; `scripts/discord-voice-mode.sh list` shows valid keys.
+#
 # In stt-tts the realtime block is deleted (realtime: null), matching
-# `scripts/discord-voice-mode.sh claude`, so a realtime block left in the
+# `scripts/discord-voice-mode.sh default`, so a realtime block left in the
 # persisted openclaw.json by an earlier live switch doesn't linger.
 if [ "$VOICE_MODE" = "stt-tts" ]; then
   REALTIME_JSON=", realtime: null"
@@ -57,9 +62,9 @@ else
 fi
 
 node openclaw.mjs config patch --stdin << JSONEOF >/dev/null 2>&1 \
-  && echo "Configured Discord voice mode ($VOICE_MODE, tts: $TTS_PROVIDER)." \
+  && echo "Configured Discord voice mode ($VOICE_MODE, model: $VOICE_MODEL, tts: $TTS_PROVIDER)." \
   || echo "Warning: failed to configure Discord voice mode"
-{ channels: { discord: { voice: { enabled: true, mode: "$VOICE_MODE", tts: { provider: "$TTS_PROVIDER" }$REALTIME_JSON } } } }
+{ channels: { discord: { voice: { enabled: true, mode: "$VOICE_MODE", model: "$VOICE_MODEL", tts: { provider: "$TTS_PROVIDER" }$REALTIME_JSON } } } }
 JSONEOF
 
 # --- Voice session reset (bundled with discord-voice — meaningless on its

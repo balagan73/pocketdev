@@ -18,6 +18,13 @@
 #   explicit spend approval (see AGENTS.md "Existing Solutions Preflight").
 voice_mode: stt-tts
 
+# voice_model: the OpenClaw agent model (provider/model key) that answers in
+# stt-tts mode and handles consults in agent-proxy/bidi. Must be a key from
+# OpenClaw's model catalog — `scripts/discord-voice-mode.sh list` prints
+# them, and `scripts/discord-voice-mode.sh model <key>` switches live. Can be
+# overridden at container start by the DISCORD_VOICE_MODEL env var.
+voice_model: anthropic/claude-haiku-4-5
+
 # tts_provider: which entry under messages.tts.providers to use for voice
 # playback in stt-tts mode. Ignored in agent-proxy/bidi mode, where the
 # realtime provider handles audio directly. Defaults to tts-local-cli
